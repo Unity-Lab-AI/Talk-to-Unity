@@ -241,6 +241,27 @@ body[data-app-state='experience'] #app-root[hidden] {
     line-height: 1.6;
 }
 
+.dependency-name {
+    position: relative;
+    padding-left: 36px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dependency-name::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-amber), #b45309);
+    box-shadow: 0 0 0 2px rgba(26, 10, 0, 0.5), 0 8px 22px rgba(244, 114, 22, 0.28);
+    transition: background 0.4s ease, box-shadow 0.4s ease, opacity 0.4s ease;
+}
+
 .dependency-light {
     width: 28px;
     height: 28px;
@@ -271,9 +292,19 @@ body[data-app-state='experience'] #app-root[hidden] {
     box-shadow: 0 0 0 2px rgba(26, 0, 0, 0.55), 0 12px 30px rgba(255, 62, 62, 0.42);
 }
 
+.dependency-item[data-state='fail'] .dependency-name::before {
+    background: linear-gradient(135deg, var(--accent-red), #7f1d1d);
+    box-shadow: 0 0 0 2px rgba(26, 0, 0, 0.55), 0 8px 22px rgba(255, 62, 62, 0.32);
+}
+
 .dependency-light[data-state='pass'] {
     background: linear-gradient(135deg, var(--accent-green), #047857);
     box-shadow: 0 0 0 2px rgba(0, 20, 10, 0.5), 0 12px 30px rgba(52, 211, 153, 0.4);
+}
+
+.dependency-item[data-state='pass'] .dependency-name::before {
+    background: linear-gradient(135deg, var(--accent-green), #047857);
+    box-shadow: 0 0 0 2px rgba(0, 20, 10, 0.5), 0 8px 22px rgba(52, 211, 153, 0.28);
 }
 
 .dependency-list {
