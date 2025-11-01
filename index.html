@@ -28,10 +28,83 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="./style.css?v=20240606" />
-    <link rel="stylesheet" href="./AI/ai.css" />
-    <script defer src="./landing.js?v=20240606"></script>
-    <script defer src="./AI/app.js"></script>
+    <script>
+        (function loadTalkToUnityAssets() {
+            const VERSION = '20240606';
+
+            function normalizeBasePath() {
+                try {
+                    const url = new URL(window.location.href);
+                    let { pathname } = url;
+
+                    if (!pathname.endsWith('/')) {
+                        const lastSegment = pathname.substring(pathname.lastIndexOf('/') + 1);
+                        if (!lastSegment || lastSegment.indexOf('.') === -1) {
+                            pathname += '/';
+                        } else {
+                            pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+                        }
+                    }
+
+                    return `${url.origin}${pathname}`;
+                } catch (error) {
+                    console.warn('Unable to determine asset base path, falling back to relative paths.', error);
+                    return '';
+                }
+            }
+
+            function ensureTrailingSlash(value) {
+                if (typeof value !== 'string' || !value) {
+                    return '';
+                }
+                return value.endsWith('/') ? value : `${value}/`;
+            }
+
+            const inferredBase = ensureTrailingSlash(normalizeBasePath());
+            const assetBase = ensureTrailingSlash(
+                typeof window.__talkToUnityAssetBase === 'string' && window.__talkToUnityAssetBase
+                    ? window.__talkToUnityAssetBase
+                    : inferredBase
+            );
+
+            window.__talkToUnityAssetBase = assetBase;
+            if (!window.__talkToUnityAssetVersion) {
+                window.__talkToUnityAssetVersion = VERSION;
+            }
+
+            function resolveAsset(path) {
+                try {
+                    return new URL(path, assetBase || window.location.href).toString();
+                } catch (error) {
+                    console.warn('Falling back to relative asset path for', path, error);
+                    return path;
+                }
+            }
+
+            function appendStylesheet(path) {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = resolveAsset(path);
+                document.head.appendChild(link);
+            }
+
+            function appendScript(path) {
+                const script = document.createElement('script');
+                script.defer = true;
+                script.src = resolveAsset(path);
+                document.head.appendChild(script);
+            }
+
+            appendStylesheet(`style.css?v=${VERSION}`);
+            appendStylesheet('AI/ai.css');
+            appendScript(`landing.js?v=${VERSION}`);
+            appendScript('AI/app.js');
+        })();
+    </script>
+    <noscript>
+        <link rel="stylesheet" href="./style.css?v=20240606" />
+        <link rel="stylesheet" href="./AI/ai.css" />
+    </noscript>
 </head>
 <body class="no-js" data-app-state="landing">
     <noscript>
