@@ -14,6 +14,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
+class Error(Exception):
+    """Exception raised by the lightweight Playwright stub."""
+
+
 class SyncPlaywrightContext(AbstractContextManager):
     """Context manager returning the lightweight Playwright stub."""
 
@@ -425,4 +429,4 @@ class PageStub:
         return options
 
 
-__all__ = ["sync_playwright"]
+__all__ = ["Error", "sync_playwright"]
