@@ -128,26 +128,78 @@ function showRecheckInProgress() {
 document.addEventListener('DOMContentLoaded', () => {
     evaluateDependencies();
 
-    launchButton?.addEventListener('click', () => {
-        const { allMet } = evaluateDependencies({ announce: true });
-        if (allMet) {
-            document.cookie = "checks-passed=true;path=/";
-            // Show the AI app and hide the landing page
-            const landingSection = document.getElementById('landing');
-            const appRoot = document.getElementById('app-root');
-            if (landingSection && appRoot) {
-                landingSection.style.display = 'none';
-                appRoot.hidden = false;
-                window.startApplication();
-            }
-        }
-    });
-
     recheckButton?.addEventListener('click', () => {
         showRecheckInProgress();
         evaluateDependencies({ announce: true });
     });
 });
+
+function ensureTrailingSlash(value) {
+    if (typeof value !== 'string' || !value) {
+        return '';
+    }
+    return value.endsWith('/') ? value : `${value}/`;
+}
+
+function resolveAppLaunchUrl() {
+    const configuredBase =
+        typeof window.__talkToUnityAssetBase === 'string' && window.__talkToUnityAssetBase
+            ? window.__talkToUnityAssetBase
+            : '';
+
+    let base = ensureTrailingSlash(configuredBase);
+
+    if (!base) {
+        try {
+            base = ensureTrailingSlash(new URL('.', window.location.href).toString());
+        } catch (error) {
+            console.warn('Unable to determine Talk to Unity base path. Falling back to relative navigation.', error);
+            base = '';
+        }
+    }
+
+    try {
+        return new URL('AI/index.html', base || window.location.href).toString();
+    } catch (error) {
+        console.warn('Failed to resolve Talk to Unity application URL. Using a relative fallback.', error);
+        return 'AI/index.html';
+    }
+}
+
+function handleLaunchEvent(event) {
+    const detail = event?.detail ?? {};
+    const { allMet = false, missing = [], mode = 'standard' } = detail;
+
+    const launchUrl = resolveAppLaunchUrl();
+    if (!launchUrl) {
+        return;
+    }
+
+    const summary = formatDependencyList(missing);
+    const launchMessage = allMet
+        ? 'All systems look good. Redirecting to Talk to Unity…'
+        : summary
+        ? `Launching Talk to Unity in compatibility mode. Some features may be limited: ${summary}.`
+        : 'Launching Talk to Unity in compatibility mode. Some features may be limited.';
+
+    setStatusMessage(launchMessage, allMet ? 'success' : 'warning');
+
+    document.cookie = 'checks-passed=true;path=/';
+
+    if (mode === 'compatibility') {
+        dependencyLight?.setAttribute('aria-label', 'Launching Talk to Unity in compatibility mode');
+    }
+
+    if (launchButton) {
+        launchButton.disabled = true;
+        launchButton.setAttribute('aria-disabled', 'true');
+        launchButton.dataset.state = 'pending';
+    }
+
+    window.location.assign(launchUrl);
+}
+
+window.addEventListener('talk-to-unity:launch', handleLaunchEvent);
 
 window.addEventListener('focus', () => {
     evaluateDependencies();
