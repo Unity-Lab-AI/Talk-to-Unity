@@ -1,4 +1,12 @@
 (() => {
+    if (typeof window !== 'undefined') {
+        window.addEventListener('error', (event) => {
+            if (event?.message) {
+                console.error('Talk to Unity runtime error:', event.message, event.error?.stack || '');
+            }
+        });
+    }
+
     const landingSection = document.getElementById('landing');
     const appRoot = document.getElementById('app-root');
     const heroStage = document.getElementById('hero-stage');
@@ -415,12 +423,12 @@
         }
 
         applyTheme(currentTheme);
+        setupSpeechRecognition();
 
         if (!systemPromptLoaded) {
             await loadSystemPrompt();
         }
 
-        setupSpeechRecognition();
         updateMuteIndicator();
 
         if (auto) {
@@ -743,6 +751,14 @@
                 label: `Microphone error: ${event.error}`
             });
         };
+
+        if (!isMuted) {
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error('Failed to start recognition after initialization:', error);
+            }
+        }
     }
 
     async function initializeVoiceControl() {
@@ -929,12 +945,8 @@
             .replace(/\ \[^]]*\bcommand\b[^]]*\]/gi, ' ')
             .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
             .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
-            .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,
-\s-]+
-/gi, ' ')
-            .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,
-\s-]+
-/gi, ' ')
+            .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+            .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
             .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
             .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
 
@@ -1173,7 +1185,7 @@
     }
 
     function escapeRegExp(value) {
-        return value.replace(/[-/\\^$*+?.()|[\{\}]/g, '\\$&');
+        return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
     }
 
     function removeImageReferences(text, imageUrl) {
@@ -1756,5 +1768,14 @@
 
         window.open(imageUrl, '_blank');
         speak('Image opened in new tab.');
+    }
+
+    if (typeof window !== 'undefined') {
+        Object.assign(window, {
+            applyTheme,
+            setMutedState,
+            startApplication,
+            attemptUnmute
+        });
     }
 })();
