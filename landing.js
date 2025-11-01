@@ -14,6 +14,9 @@ const launchButton = document.getElementById('launch-app');
 const recheckButton = document.getElementById('recheck-dependencies');
 const statusMessage = document.getElementById('status-message');
 
+let allowLaunchOverride = false;
+let defaultLaunchLabel = '';
+
 const dependencyChecks = [
     {
         id: 'secure-context',
@@ -43,6 +46,29 @@ const dependencyChecks = [
     }
 ];
 
+function setLaunchButtonState(allMet) {
+    if (!launchButton) {
+        return;
+    }
+
+    if (!defaultLaunchLabel) {
+        defaultLaunchLabel = launchButton.textContent?.trim() ?? 'Launch Unity Voice Lab';
+    }
+
+    launchButton.disabled = false;
+    launchButton.setAttribute('aria-disabled', 'false');
+
+    if (allMet) {
+        allowLaunchOverride = false;
+        launchButton.textContent = defaultLaunchLabel;
+        launchButton.dataset.launchOverride = 'clear';
+        return;
+    }
+
+    launchButton.dataset.launchOverride = allowLaunchOverride ? 'ready' : 'required';
+    launchButton.textContent = allowLaunchOverride ? 'Launch anyway' : defaultLaunchLabel;
+}
+
 function evaluateDependencies({ announce = false } = {}) {
     const results = dependencyChecks.map((descriptor) => {
         let met = false;
@@ -61,10 +87,7 @@ function evaluateDependencies({ announce = false } = {}) {
     const allMet = results.every((result) => result.met);
     updateDependencyUI(results, allMet, { announce });
 
-    if (launchButton) {
-        launchButton.disabled = !allMet;
-        launchButton.setAttribute('aria-disabled', String(!allMet));
-    }
+    setLaunchButtonState(allMet);
 
     return { results, allMet };
 }
@@ -139,7 +162,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
-        if (!allMet) {
+        if (!allMet && !allowLaunchOverride) {
+            allowLaunchOverride = true;
+            setLaunchButtonState(false);
+
+            if (statusMessage) {
+                const advisory =
+                    'Some requirements are still missing. Select “Launch anyway” to continue with limited functionality.';
+                statusMessage.textContent = statusMessage.textContent
+                    ? `${statusMessage.textContent} ${advisory}`
+                    : advisory;
+            }
             return;
         }
 

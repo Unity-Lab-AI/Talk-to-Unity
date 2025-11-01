@@ -18,6 +18,7 @@ const dependencySummary = document.getElementById('dependency-summary');
 const dependencyList = document.getElementById('dependency-list');
 const launchButton = document.getElementById('launch-app');
 const recheckButton = document.getElementById('recheck-dependencies');
+const statusMessage = document.getElementById('status-message');
 const redirectToLandingWithStatus = () => {
     const landingUrl = new URL(window.location.href);
     landingUrl.search = '';
@@ -55,6 +56,8 @@ let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
 let appStarted = false;
+let allowLaunchOverride = false;
+let defaultLaunchLabel = '';
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
@@ -139,7 +142,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
-        if (!allMet) {
+        if (!allMet && !allowLaunchOverride) {
+            allowLaunchOverride = true;
+            setLaunchButtonState(false);
+
+            if (statusMessage) {
+                const advisory =
+                    'Some requirements are still missing. Select “Launch anyway” to continue with limited functionality.';
+                statusMessage.textContent = statusMessage.textContent
+                    ? `${statusMessage.textContent} ${advisory}`
+                    : advisory;
+            }
             return;
         }
 
@@ -157,6 +170,29 @@ window.addEventListener('focus', () => {
         evaluateDependencies();
     }
 });
+
+function setLaunchButtonState(allMet) {
+    if (!launchButton) {
+        return;
+    }
+
+    if (!defaultLaunchLabel) {
+        defaultLaunchLabel = launchButton.textContent?.trim() ?? 'Launch Unity Voice Lab';
+    }
+
+    launchButton.disabled = false;
+    launchButton.setAttribute('aria-disabled', 'false');
+
+    if (allMet) {
+        allowLaunchOverride = false;
+        launchButton.textContent = defaultLaunchLabel;
+        launchButton.dataset.launchOverride = 'clear';
+        return;
+    }
+
+    launchButton.dataset.launchOverride = allowLaunchOverride ? 'ready' : 'required';
+    launchButton.textContent = allowLaunchOverride ? 'Launch anyway' : defaultLaunchLabel;
+}
 
 function evaluateDependencies({ announce = false } = {}) {
     const results = dependencyChecks.map((descriptor) => {
@@ -176,10 +212,7 @@ function evaluateDependencies({ announce = false } = {}) {
     const allMet = results.every((result) => result.met);
     updateDependencyUI(results, allMet, { announce });
 
-    if (launchButton) {
-        launchButton.disabled = !allMet;
-        launchButton.setAttribute('aria-disabled', String(!allMet));
-    }
+    setLaunchButtonState(allMet);
 
     return { results, allMet };
 }
