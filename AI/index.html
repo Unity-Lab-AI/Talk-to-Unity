@@ -3,28 +3,29 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Unity Voice Lab</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Roboto+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
-    />
-    <link rel="stylesheet" href="../style.css" />
-    <link rel="stylesheet" href="./ai.css" />
+    <title>Unity Voice Lab – System Check</title>
     <script>
-        (function() {
-            // Check for the "checks-passed" cookie
-            if (document.cookie.indexOf('checks-passed=true') === -1) {
-                // If the cookie is not found, redirect to the landing page
-                window.location.href = '/';
+        (function () {
+            try {
+                var path = window.location.pathname || '';
+                if (!path.endsWith('/')) {
+                    var lastSegment = path.substring(path.lastIndexOf('/') + 1);
+                    if (lastSegment && lastSegment.indexOf('.') === -1) {
+                        var search = window.location.search || '';
+                        var hash = window.location.hash || '';
+                        var destination = path + '/' + search + hash;
+                        window.location.replace(destination);
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to normalize trailing slash for assets:', error);
             }
         })();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1"></script>
-    <script type="module" src="./app.js"></script>
+    <link rel="stylesheet" href="./style.css" />
+    <script defer src="./app.js"></script>
 </head>
-<body class="no-js" data-app-state="experience">
+<body class="no-js" data-app-state="landing">
     <noscript>
         <div class="no-js-banner" role="alert">
             <strong>JavaScript is disabled.</strong>
@@ -32,7 +33,129 @@
         </div>
     </noscript>
 
-    <div id="app-root">
+    <section id="landing" class="landing" aria-labelledby="landing-title">
+        <div class="landing-hero">
+            <span class="landing-badge">Unity voice lab check-in</span>
+            <h1 id="landing-title">Let’s make sure every light is green</h1>
+            <p class="landing-lede">
+                Before Unity can chat with you, we run a quick readiness scan on your browser. Think of it like making sure
+                your helmet is on straight. When a light turns red, read the friendly tip, fix it, then press “Check again.”
+            </p>
+            <div class="landing-links">
+                <a class="landing-link" href="https://unityailab.online" target="_blank" rel="noopener">Back to Unity AI Lab home</a>
+                <a class="landing-link" href="https://github.com/Unity-Lab-AI/Talk-to-Unity" target="_blank" rel="noopener">View the project on GitHub</a>
+            </div>
+        </div>
+
+        <div id="status-message" class="landing-status" role="status" aria-live="polite"></div>
+
+        <div class="landing-body">
+            <div class="dependency-summary">
+                <span
+                    class="dependency-light"
+                    data-role="dependency-light"
+                    data-state="pending"
+                    aria-live="polite"
+                    aria-label="Checking requirements"
+                ></span>
+                <div class="dependency-summary-text">
+                    <h2>What the lights mean</h2>
+                    <p id="dependency-summary">
+                        We’re checking right now. Green means your setup is ready. A red light means we need to fix that part together
+                        before Unity can listen.
+                    </p>
+                </div>
+            </div>
+
+            <ul id="dependency-list" class="dependency-list">
+                <li class="dependency-item" data-dependency="secure-context" data-state="pending">
+                    <div class="dependency-header">
+                        <span class="dependency-name">Secure connection (HTTPS or localhost)</span>
+                        <span class="dependency-status">Checking…</span>
+                    </div>
+                    <p class="dependency-instructions">
+                        If this light is red: look at the address bar at the top. The link should start with <code>https://</code> or say
+                        <code>localhost</code>. If it doesn’t, add the missing <code>https://</code> or open the site from our secure Unity AI Lab page.
+                        It’s just like buckling a seatbelt so everything stays safe.
+                    </p>
+                    <p class="dependency-reminder">After you fix it, press the big “Check again” button.</p>
+                </li>
+                <li class="dependency-item" data-dependency="speech-recognition" data-state="pending">
+                    <div class="dependency-header">
+                        <span class="dependency-name">Web Speech Recognition API</span>
+                        <span class="dependency-status">Checking…</span>
+                    </div>
+                    <p class="dependency-instructions">
+                        If this light is red: your browser can’t hear you yet. Open this page in the latest version of Google Chrome,
+                        Microsoft Edge, or another browser that supports talking and listening. Imagine switching to a friend who knows how
+                        to play the game.
+                    </p>
+                    <p class="dependency-reminder">Switch browsers or update yours, then press “Check again.”</p>
+                </li>
+                <li class="dependency-item" data-dependency="speech-synthesis" data-state="pending">
+                    <div class="dependency-header">
+                        <span class="dependency-name">Speech synthesis voices</span>
+                        <span class="dependency-status">Checking…</span>
+                    </div>
+                    <p class="dependency-instructions">
+                        If this light is red: the browser doesn’t know how to speak back. Make sure your speakers aren’t muted and that
+                        you’re using a browser with voice support (Chrome, Edge, or Safari on desktop works best). Refresh the page after
+                        turning the sound on.
+                    </p>
+                    <p class="dependency-reminder">When you’re ready, press “Check again” to retry.</p>
+                </li>
+                <li class="dependency-item" data-dependency="microphone" data-state="pending">
+                    <div class="dependency-header">
+                        <span class="dependency-name">Microphone access</span>
+                        <span class="dependency-status">Checking…</span>
+                    </div>
+                    <p class="dependency-instructions">
+                        If this light is red: the browser needs permission to hear you. Look for a pop-up asking to use your microphone and
+                        click “Allow.” If you missed it, click the lock icon in the address bar and enable the microphone. It’s like giving a
+                        friend permission to listen to your story.
+                    </p>
+                    <p class="dependency-reminder">Press “Check again” after allowing the microphone.</p>
+                </li>
+            </ul>
+        </div>
+
+        <div class="landing-instructions" aria-labelledby="landing-how-to-title">
+            <h2 id="landing-how-to-title">How to get every light to glow green</h2>
+            <ol class="landing-steps">
+                <li>
+                    <strong>Stay on a secure connection.</strong> Always load <code>https://unityailab.com/Talk-to-Unity/</code> or run the site from
+                    <code>localhost</code> while developing. If you see <code>http://</code> in the address bar, add the missing “s” or jump back to the
+                    Unity AI Lab home page and enter from there.
+                </li>
+                <li>
+                    <strong>Use a browser that can listen.</strong> We recommend the latest Chrome or Edge. Safari works on macOS, and Firefox users should
+                    switch for this experience because it does not support the speech APIs we rely on.
+                </li>
+                <li>
+                    <strong>Give Unity a voice and ears.</strong> Turn your speakers on, set your system output to the right device, and when the browser asks
+                    for microphone access, click <em>Allow</em>. You can also review these permissions via the lock icon near the URL bar.
+                </li>
+                <li>
+                    <strong>Re-run the check.</strong> Once you’ve made changes, press “Check again.” When every status reads “Ready,” the “Talk to Unity” button below
+                    will unlock and slide the live lab into view on this page.
+                </li>
+                <li>
+                    <strong>Remember the unmute cue.</strong> When the lab loads, <em>Tap or click anywhere to unmute</em> so Unity can hear you and respond.
+                </li>
+            </ol>
+            <p>
+                Need help? Refresh the page to start over, or read the tips above each red item. When everything looks good, we’ll send you forward
+                to the interactive Unity assistant.
+            </p>
+        </div>
+
+        <div class="landing-actions">
+            <button id="launch-app" class="primary" type="button" disabled aria-disabled="true">Talk to Unity</button>
+            <button id="recheck-dependencies" class="ghost" type="button">Check again</button>
+        </div>
+    </section>
+
+    <div id="app-root" hidden>
         <div class="app-shell">
             <header class="status-banner" role="status" aria-live="polite">
                 <button id="mute-indicator" class="mute-indicator" data-state="muted" type="button">
