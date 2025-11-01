@@ -46,15 +46,27 @@ body {
     color: var(--text-color);
     background-color: transparent;
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
+    align-items: stretch;
     width: 100%;
     position: relative;
 }
 
 html {
     background-color: var(--bg-color);
+}
+
+.app-shell {
+    position: relative;
+    z-index: 2;
+    width: min(1200px, 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: clamp(32px, 12vh, 140px) clamp(24px, 8vw, 120px);
+    gap: clamp(24px, 6vh, 60px);
 }
 
 #background {
@@ -73,13 +85,19 @@ html {
     opacity: 1;
 }
 
+.status-banner {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 .layout {
     width: 100%;
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
-    padding: clamp(32px, 10vh, 120px) clamp(20px, 8vw, 120px);
     position: relative;
     z-index: 2;
 }
@@ -151,9 +169,8 @@ html {
 }
 
 .mute-indicator {
-    position: sticky;
-    bottom: 0;
-    margin: clamp(12px, 4vh, 32px) auto;
+    position: relative;
+    margin: 0 auto;
     align-self: center;
     padding: 14px 24px;
     border-radius: 999px;
@@ -170,8 +187,6 @@ html {
     justify-content: center;
     max-width: min(460px, calc(100% - 32px));
     backdrop-filter: blur(10px);
-    z-index: 3;
-    position: relative;
 }
 
 :root[data-theme='light'] .mute-indicator {
@@ -222,6 +237,11 @@ html {
 }
 
 @media (max-width: 720px) {
+    .app-shell {
+        padding: clamp(28px, 10vh, 80px) clamp(16px, 6vw, 32px);
+        gap: clamp(20px, 6vh, 48px);
+    }
+
     .voice-stage {
         flex-direction: column;
         gap: clamp(32px, 14vh, 80px);

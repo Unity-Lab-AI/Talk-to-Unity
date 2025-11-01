@@ -497,6 +497,120 @@ function sanitizeForSpeech(text) {
     return sanitized;
 }
 
+function sanitizeImageUrl(rawUrl) {
+    if (typeof rawUrl !== 'string') {
+        return '';
+    }
+
+    return rawUrl
+        .trim()
+        .replace(/^["'<\[(]+/, '')
+        .replace(/["'>)\]]+$/, '')
+        .replace(/[,.;!]+$/, '');
+}
+
+function extractImageUrl(text) {
+    if (typeof text !== 'string' || text.trim() === '') {
+        return '';
+    }
+
+    const markdownMatch = text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
+    if (markdownMatch && markdownMatch[1]) {
+        return sanitizeImageUrl(markdownMatch[1]);
+    }
+
+    const urlMatch = text.match(/https?:\/\/[^\s)]+/i);
+    if (urlMatch && urlMatch[0]) {
+        return sanitizeImageUrl(urlMatch[0]);
+    }
+
+    return '';
+}
+
+function normalizeCommandValue(value) {
+    return value.replace(/[\s-]+/g, '_').trim().toLowerCase();
+}
+
+function parseAiDirectives(responseText) {
+    if (typeof responseText !== 'string' || responseText.trim() === '') {
+        return { cleanedText: '', commands: [] };
+    }
+
+    const commands = [];
+    const cleanedText = responseText
+        .replace(/\[command:\s*([^\]]+)\]/gi, (_match, commandValue) => {
+            if (commandValue) {
+                const normalized = normalizeCommandValue(commandValue);
+                if (normalized) {
+                    commands.push(normalized);
+                }
+            }
+            return '';
+        })
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+    return { cleanedText, commands };
+}
+
+async function executeAiCommand(command) {
+    if (!command) {
+        return false;
+    }
+
+    const normalized = normalizeCommandValue(command);
+
+    switch (normalized) {
+        case 'mute_microphone':
+            await setMutedState(true, { announce: true });
+            return true;
+        case 'unmute_microphone':
+            await setMutedState(false, { announce: true });
+            return true;
+        case 'stop_speaking':
+        case 'shutup':
+            synth.cancel();
+            setCircleState(aiCircle, {
+                speaking: false,
+                label: 'Unity is idle'
+            });
+            return true;
+        case 'copy_image':
+            await copyImageToClipboard();
+            return true;
+        case 'save_image':
+            await saveImage();
+            return true;
+        case 'open_image':
+            openImageInNewTab();
+            return true;
+        case 'set_model_flux':
+            currentImageModel = 'flux';
+            speak('Image model set to flux.');
+            return true;
+        case 'set_model_turbo':
+            currentImageModel = 'turbo';
+            speak('Image model set to turbo.');
+            return true;
+        case 'set_model_kontext':
+            currentImageModel = 'kontext';
+            speak('Image model set to kontext.');
+            return true;
+        case 'clear_chat_history':
+            chatHistory = [];
+            speak('Chat history cleared.');
+            return true;
+        case 'theme_light':
+            applyTheme('light', { announce: true });
+            return true;
+        case 'theme_dark':
+            applyTheme('dark', { announce: true });
+            return true;
+        default:
+            return false;
+    }
+}
+
 function speak(text) {
     if (synth.speaking) {
         synth.cancel();
@@ -678,37 +792,7 @@ function handleVoiceCommand(command) {
 }
 
 const POLLINATIONS_TEXT_URL = 'https://text.pollinations.ai/openai';
-const POLLINATIONS_IMAGE_BASE_URL = 'https://image.pollinations.ai/prompt/';
-const POLLINATIONS_IMAGE_REFERRER = 'unityailab.com';
 const UNITY_REFERRER = 'https://www.unityailab.com/';
-
-function generateImageSeed() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-function buildImageUrl(prompt) {
-    if (typeof prompt !== 'string') {
-        return '';
-    }
-
-    const trimmedPrompt = prompt.trim();
-
-    if (!trimmedPrompt) {
-        return '';
-    }
-
-    const params = new URLSearchParams({
-        height: '512',
-        width: '512',
-        private: 'true',
-        enhance: 'true',
-        seed: generateImageSeed(),
-        model: currentImageModel,
-        referrer: POLLINATIONS_IMAGE_REFERRER
-    });
-
-    return `${POLLINATIONS_IMAGE_BASE_URL}${encodeURIComponent(trimmedPrompt)}?${params.toString()}`;
-}
 
 function shouldUseUnityReferrer() {
     if (typeof window === 'undefined') {
@@ -791,11 +875,18 @@ async function getAIResponse(userInput) {
         const assistantMessage = cleanedText || aiText;
         chatHistory.push({ role: 'assistant', content: assistantMessage });
 
-        if (!commands.includes('shutup')) {
+        const shouldSuppressSpeech = commands.includes('shutup') || commands.includes('stop_speaking');
+
+        if (!shouldSuppressSpeech) {
             const spokenText = sanitizeForSpeech(assistantMessage);
             if (spokenText) {
                 speak(spokenText);
             }
+        }
+
+        const imageUrlFromResponse = extractImageUrl(aiText) || extractImageUrl(assistantMessage);
+        if (imageUrlFromResponse) {
+            updateBackgroundImage(imageUrlFromResponse);
         }
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
@@ -810,15 +901,6 @@ async function getAIResponse(userInput) {
                 label: 'Unity is idle'
             });
         }, 2400);
-    }
-
-    try {
-        const imageUrl = buildImageUrl(userInput);
-        if (imageUrl) {
-            updateBackgroundImage(imageUrl);
-        }
-    } catch (error) {
-        console.error('Error getting image from Pollinations AI:', error);
     }
 }
 
