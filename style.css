@@ -1,0 +1,200 @@
+:root {
+    color-scheme: dark;
+    --bg-color: #0b0b0f;
+    --border-color: rgba(255, 255, 255, 0.18);
+    --text-color: #f5f5f5;
+    --muted-text: rgba(245, 245, 245, 0.82);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--text-color);
+    background-color: var(--bg-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+#background {
+    position: fixed;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(24px) saturate(120%);
+    transform: scale(1.02);
+    z-index: -2;
+}
+
+#background::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(5, 6, 12, 0.85) 0%, rgba(5, 6, 12, 0.95) 80%, rgba(5, 6, 12, 1) 100%);
+    z-index: -1;
+}
+
+.layout {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(32px, 10vh, 120px) clamp(20px, 8vw, 120px);
+}
+
+.voice-stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(24px, 14vw, 140px);
+    width: min(960px, 100%);
+}
+
+.voice-circle {
+    position: relative;
+    width: clamp(140px, 35vw, 220px);
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(12, 14, 24, 0.68);
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+    transition: border-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease;
+}
+
+.pulse-ring {
+    position: absolute;
+    inset: 12%;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    opacity: 0;
+    z-index: 1;
+}
+
+.voice-circle.ai .pulse-ring {
+    border-color: rgba(124, 92, 255, 0.6);
+}
+
+.voice-circle.user .pulse-ring {
+    border-color: rgba(67, 217, 189, 0.6);
+}
+
+.voice-circle.is-speaking {
+    box-shadow: 0 0 42px -18px rgba(255, 255, 255, 0.6);
+    transform: translateY(-6px) scale(1.03);
+}
+
+.voice-circle.is-speaking .pulse-ring {
+    animation: pulse 1.4s ease-in-out infinite;
+    opacity: 1;
+}
+
+.voice-circle.is-listening {
+    border-color: rgba(67, 217, 189, 0.8);
+    box-shadow: 0 0 42px -12px rgba(67, 217, 189, 0.6);
+}
+
+.voice-circle.is-error {
+    border-color: rgba(255, 99, 132, 0.8);
+    box-shadow: 0 0 38px -10px rgba(255, 99, 132, 0.5);
+}
+
+.mute-indicator {
+    position: sticky;
+    bottom: 0;
+    margin: clamp(12px, 4vh, 32px) auto;
+    align-self: center;
+    padding: 14px 24px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(12, 14, 24, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--muted-text);
+    font-size: clamp(0.9rem, 2.2vw, 1rem);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: transform 0.25s ease, background 0.25s ease, opacity 0.25s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: min(460px, calc(100% - 32px));
+    backdrop-filter: blur(10px);
+    z-index: 4;
+}
+
+.mute-indicator:focus-visible {
+    outline: 3px solid rgba(124, 92, 255, 0.8);
+    outline-offset: 4px;
+}
+
+.mute-indicator:hover,
+.mute-indicator:active {
+    transform: translateY(-2px) scale(1.01);
+    background: rgba(12, 14, 24, 0.82);
+}
+
+.mute-indicator[data-state="listening"] {
+    background: rgba(67, 217, 189, 0.16);
+    border-color: rgba(67, 217, 189, 0.5);
+    color: var(--text-color);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.12);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 720px) {
+    .voice-stage {
+        flex-direction: column;
+        gap: clamp(32px, 14vh, 80px);
+    }
+}
+
+@media (max-width: 520px) {
+    .layout {
+        padding-top: clamp(48px, 12vh, 80px);
+        padding-bottom: clamp(48px, 18vh, 120px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
