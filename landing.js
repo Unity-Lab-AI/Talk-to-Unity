@@ -7,14 +7,15 @@ const statusMessage = document.getElementById('status-message');
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
 
+const LOOPBACK_HOST_PATTERN = /^(?:localhost|127(?:\.\d{1,3}){3}|::1|\[::1\])$/;
+
 const dependencyChecks = [
     {
         id: 'secure-context',
         label: 'Secure connection (HTTPS or localhost)',
         friendlyName: 'secure connection light',
         check: () =>
-            Boolean(window.isSecureContext) ||
-            /^localhost$|^127(?:\.\d{1,3}){3}$|^\[::1\]$/.test(window.location.hostname)
+            Boolean(window.isSecureContext) || LOOPBACK_HOST_PATTERN.test(window.location.hostname)
     },
     {
         id: 'speech-recognition',

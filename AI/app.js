@@ -59,14 +59,15 @@
     let dependencyState = { results: [], allMet: false, missing: [] };
     let unmuteInProgress = false;
 
+    const LOOPBACK_HOST_PATTERN = /^(?:localhost|127(?:\.\d{1,3}){3}|::1|\[::1\])$/;
+    const UNITY_ALLOWED_HOST_SUFFIXES = ['unityailab.com', 'unityailab.online'];
+
     const dependencyChecks = [
         {
             id: 'secure-context',
             label: 'Secure connection (HTTPS or localhost)',
             friendlyName: 'secure connection light',
-            check: () =>
-                Boolean(window.isSecureContext) ||
-                /^localhost$|^127(?:\.\d{1,3}){3}$|^[::1]$/.test(window.location.hostname)
+            check: () => Boolean(window.isSecureContext) || LOOPBACK_HOST_PATTERN.test(window.location.hostname)
         },
         {
             id: 'speech-recognition',
@@ -1579,6 +1580,31 @@
     const POLLINATIONS_TEXT_URL = 'https://text.pollinations.ai/openai';
     const UNITY_REFERRER = 'https://www.unityailab.com/';
 
+    function isUnityDomain(hostname) {
+        return UNITY_ALLOWED_HOST_SUFFIXES.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+    }
+
+    function shouldUseUnityReferrer() {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+
+        try {
+            const { protocol, hostname } = window.location;
+            if (protocol === 'file:') {
+                return true;
+            }
+
+            if (LOOPBACK_HOST_PATTERN.test(hostname) || isUnityDomain(hostname)) {
+                return true;
+            }
+        } catch (error) {
+            console.warn('Unable to determine referrer eligibility:', error);
+        }
+
+        return false;
+    }
+
     async function getAIResponse(userInput) {
         console.log(`Sending to AI: ${userInput}`);
 
@@ -1598,18 +1624,23 @@
                 model: 'unity'
             });
 
-            const textResponse = await fetch(POLLINATIONS_TEXT_URL, {
+            const requestInit = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                body: pollinationsPayload
+            };
+
+            if (shouldUseUnityReferrer()) {
                 // Explicitly identify the Unity AI Lab referrer so the public
                 // Pollinations endpoint treats the request as coming from the
-                // approved web client even when running the app from localhost.
-                referrer: UNITY_REFERRER,
-                referrerPolicy: 'strict-origin-when-cross-origin',
-                body: pollinationsPayload,
-            });
+                // approved web client when we are running on an authorised host.
+                requestInit.referrer = UNITY_REFERRER;
+                requestInit.referrerPolicy = 'strict-origin-when-cross-origin';
+            }
+
+            const textResponse = await fetch(POLLINATIONS_TEXT_URL, requestInit);
 
             if (!textResponse.ok) {
                 throw new Error(`Pollinations text API returned ${textResponse.status}`);
