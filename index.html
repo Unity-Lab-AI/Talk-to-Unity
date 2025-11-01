@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Unity Voice Lab – System Check</title>
+    <script>
+        (function () {
+            try {
+                var path = window.location.pathname || '';
+                if (!path.endsWith('/')) {
+                    var lastSegment = path.substring(path.lastIndexOf('/') + 1);
+                    if (lastSegment && lastSegment.indexOf('.') === -1) {
+                        var search = window.location.search || '';
+                        var hash = window.location.hash || '';
+                        var destination = path + '/' + search + hash;
+                        window.location.replace(destination);
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to normalize trailing slash for assets:', error);
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="./style.css" />
     <script defer src="./app.js"></script>
 </head>
