@@ -4,6 +4,13 @@ const heroStage = document.getElementById('hero-stage');
 const heroImage = document.getElementById('hero-image');
 const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
+const normalizedPath = (() => {
+    const pathname = window.location.pathname || '';
+    const withoutIndex = pathname.replace(/index\.html$/i, '');
+    const trimmed = withoutIndex.replace(/\/+$/, '');
+    return trimmed || '/';
+})();
+const isExperienceRoute = /\/(?:AI)$/i.test(normalizedPath);
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
 const dependencyLight = document.querySelector('[data-role="dependency-light"]');
@@ -11,6 +18,17 @@ const dependencySummary = document.getElementById('dependency-summary');
 const dependencyList = document.getElementById('dependency-list');
 const launchButton = document.getElementById('launch-app');
 const recheckButton = document.getElementById('recheck-dependencies');
+const redirectToLandingWithStatus = () => {
+    const landingUrl = new URL(window.location.href);
+    landingUrl.search = '';
+    landingUrl.hash = '';
+    landingUrl.pathname = landingUrl.pathname.replace(/AI\/?(?:index\.html)?$/i, '');
+    if (!landingUrl.pathname.endsWith('/')) {
+        landingUrl.pathname = `${landingUrl.pathname}/`;
+    }
+    landingUrl.searchParams.set('missing', '1');
+    window.location.replace(landingUrl.toString());
+};
 
 if (heroImage) {
     heroImage.setAttribute('crossorigin', 'anonymous');
@@ -108,15 +126,25 @@ function resolveAssetPath(relativePath) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    evaluateDependencies();
+    const evaluation = evaluateDependencies();
 
-    launchButton?.addEventListener('click', async () => {
-        const { allMet } = evaluateDependencies();
+    if (isExperienceRoute) {
+        if (evaluation.allMet) {
+            startApplication();
+        } else {
+            redirectToLandingWithStatus();
+        }
+        return;
+    }
+
+    launchButton?.addEventListener('click', () => {
+        const { allMet } = evaluateDependencies({ announce: true });
         if (!allMet) {
             return;
         }
 
-        await startApplication();
+        const targetUrl = new URL('./AI/', window.location.href);
+        window.location.assign(targetUrl.toString());
     });
 
     recheckButton?.addEventListener('click', () => {
