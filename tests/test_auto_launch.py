@@ -1,18 +1,14 @@
-from pathlib import Path
 import re
 
-ROOT = Path(__file__).resolve().parents[1]
-APP_JS = (ROOT / "AI" / "app.js").read_text()
+
+def test_auto_start_without_landing_section(app_js: str) -> None:
+    assert "const shouldAutoStartExperience = !launchButton && !landingSection;" in app_js
+    assert "if (shouldAutoStartExperience)" in app_js
+    assert "void startApplication();" in app_js
 
 
-def test_auto_start_without_landing_section():
-    assert "const shouldAutoStartExperience = !launchButton && !landingSection;" in APP_JS
-    assert "if (shouldAutoStartExperience)" in APP_JS
-    assert "void startApplication();" in APP_JS
-
-
-def test_app_js_defines_expected_functions():
-    function_names = set(re.findall(r"function[ \t]+(\w+)", APP_JS))
+def test_app_js_defines_expected_functions(app_js: str) -> None:
+    function_names = set(re.findall(r"function[ \t]+(\w+)", app_js))
     expected = {
         "formatDependencyList",
         "setStatusMessage",
@@ -65,16 +61,16 @@ def test_app_js_defines_expected_functions():
     assert not missing, f"Missing functions from app.js: {missing}"
 
 
-def test_start_application_sets_app_state():
-    match = re.search(r"async function startApplication\([^)]*\)\s*{(.*?)}\s*async function", APP_JS, re.S)
+def test_start_application_sets_app_state(app_js: str) -> None:
+    match = re.search(r"async function startApplication\([^)]*\)\s*{(.*?)}\s*async function", app_js, re.S)
     assert match, "startApplication definition not found"
     body = match.group(1)
     assert "appStarted = true;" in body or "appStarted = !0" in body
     assert "bodyElement.dataset.appState = 'experience';" in body
 
 
-def test_set_muted_state_announces_changes():
-    match = re.search(r"async function setMutedState\([^)]*\)\s*{(.*?)}\s*async function", APP_JS, re.S)
+def test_set_muted_state_announces_changes(app_js: str) -> None:
+    match = re.search(r"async function setMutedState\([^)]*\)\s*{(.*?)}\s*async function", app_js, re.S)
     assert match, "setMutedState definition not found"
     body = match.group(1)
     assert "isMuted = muted;" in body or "isMuted = true;" in body
