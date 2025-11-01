@@ -42,6 +42,8 @@ let recognitionRestartTimeout = null;
 let appStarted = false;
 let allowLaunchOverride = false;
 let defaultLaunchLabel = '';
+let appShellReady = false;
+let systemPromptLoaded = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
 let compatibilityBanner = null;
@@ -234,6 +236,7 @@ function resolveAssetPath(relativePath) {
 
 document.addEventListener('DOMContentLoaded', () => {
     evaluateDependencies();
+    void startApplication({ auto: true });
 
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
@@ -251,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        startApplication();
+        void startApplication();
     });
 
     recheckButton?.addEventListener('click', () => {
@@ -377,19 +380,51 @@ function updateDependencyUI(results, allMet, { announce = false, missing = [] } 
     }
 }
 
-async function startApplication() {
-    if (appStarted) {
+async function startApplication({ auto = false } = {}) {
+    if (auto && appShellReady) {
+        updateMuteIndicator();
         return;
     }
 
-    appStarted = true;
+    if (!auto && appStarted) {
+        return;
+    }
 
     if (appRoot?.hasAttribute('hidden')) {
         appRoot.removeAttribute('hidden');
     }
 
-    if (bodyElement) {
+    if (!auto && bodyElement) {
         bodyElement.dataset.appState = 'experience';
+    } else if (!bodyElement?.dataset.appState) {
+        bodyElement.dataset.appState = 'landing';
+    }
+
+    if (!auto && landingSection) {
+        landingSection.setAttribute('aria-hidden', 'true');
+    } else if (auto) {
+        landingSection?.removeAttribute('aria-hidden');
+    }
+
+    if (heroStage) {
+        if (!heroStage.dataset.state) {
+            heroStage.dataset.state = 'idle';
+        }
+        heroStage.classList.add('is-visible');
+    }
+
+    applyTheme(currentTheme);
+
+    if (!systemPromptLoaded) {
+        await loadSystemPrompt();
+    }
+
+    setupSpeechRecognition();
+    updateMuteIndicator();
+
+    if (auto) {
+        appShellReady = true;
+        return;
     }
 
     const missing = dependencyState?.missing ?? [];
@@ -404,22 +439,9 @@ async function startApplication() {
         setStatusMessage('');
     }
 
-    if (landingSection) {
-        landingSection.setAttribute('aria-hidden', 'true');
-    }
-
-    if (heroStage) {
-        if (!heroStage.dataset.state) {
-            heroStage.dataset.state = 'idle';
-        }
-        heroStage.classList.add('is-visible');
-    }
-
-    applyTheme(currentTheme);
-    await loadSystemPrompt();
-    setupSpeechRecognition();
-    updateMuteIndicator();
     await initializeVoiceControl();
+    appStarted = true;
+    appShellReady = true;
     applyTheme(currentTheme, { force: true });
 }
 
@@ -583,13 +605,19 @@ function setCircleState(circle, { speaking = false, listening = false, error = f
     }
 }
 
-async function loadSystemPrompt() {
+async function loadSystemPrompt({ force = false } = {}) {
+    if (systemPromptLoaded && !force) {
+        return;
+    }
+
     try {
         const response = await fetch(resolveAssetPath('ai-instruct.txt'));
         systemPrompt = await response.text();
     } catch (error) {
         console.error('Error fetching system prompt:', error);
         systemPrompt = 'You are Unity, a helpful AI assistant.';
+    } finally {
+        systemPromptLoaded = true;
     }
 }
 
@@ -605,6 +633,10 @@ function setupSpeechRecognition() {
             banner.textContent = 'Compatibility mode active. Speech recognition is not supported in this browser.';
         }
         setStatusMessage('Compatibility mode active. Speech recognition is not supported in this browser.', 'warning');
+        return;
+    }
+
+    if (recognition) {
         return;
     }
 

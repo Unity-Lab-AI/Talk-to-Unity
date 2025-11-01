@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="0; url=../index.html" />
+    <title>Redirecting to Talk to Unity</title>
+    <script>
+        (function () {
+            try {
+                var target = '../index.html';
+                var search = window.location.search || '';
+                var hash = window.location.hash || '';
+                window.location.replace(target + search + hash);
+            } catch (error) {
+                console.warn('Redirect failed, please use the link below.', error);
+            }
+        })();
+    </script>
+</head>
+<body>
+    <p>If you are not redirected automatically, <a href="../index.html">click here to open Talk to Unity</a>.</p>
+</body>
+</html>

@@ -90,12 +90,8 @@ body[data-app-state='experience'] #landing {
     display: none;
 }
 
-body[data-app-state='landing'] #app-root {
+#app-root[hidden] {
     display: none;
-}
-
-body[data-app-state='experience'] #app-root[hidden] {
-    display: flex;
 }
 
 .landing {
@@ -542,9 +538,9 @@ code {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: radial-gradient(circle at 30% 30%, rgba(124, 92, 255, 0.25), transparent 60%),
-        radial-gradient(circle at 70% 70%, rgba(67, 217, 189, 0.2), transparent 65%),
-        rgba(12, 13, 20, 0.8);
+    background: radial-gradient(circle at 32% 28%, rgba(255, 62, 62, 0.28), transparent 62%),
+        radial-gradient(circle at 72% 74%, rgba(247, 127, 0, 0.22), transparent 68%),
+        linear-gradient(165deg, rgba(14, 6, 6, 0.92), rgba(32, 8, 8, 0.88));
     transition: opacity 0.4s ease;
     opacity: 0;
     z-index: 1;
@@ -558,7 +554,7 @@ code {
 
 #hero-stage[data-state="error"]::before {
     opacity: 1;
-    background: linear-gradient(135deg, rgba(255, 99, 132, 0.3), rgba(12, 13, 20, 0.9));
+    background: linear-gradient(140deg, rgba(255, 94, 94, 0.32), rgba(28, 6, 6, 0.9));
 }
 
 body.js-enabled #hero-stage {
