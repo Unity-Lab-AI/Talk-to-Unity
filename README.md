@@ -1,11 +1,40 @@
 # Talk to Unity
 
-[![Main Branch Workflow](https://img.shields.io/github/actions/workflow/status/UnityAILab/Talk-to-Unity/main-branch.yml?branch=main&label=Main%20Branch%20Workflow)](https://github.com/UnityAILab/Talk-to-Unity/actions/workflows/main-branch.yml)
-[![Pull Request Validation](https://img.shields.io/github/actions/workflow/status/UnityAILab/Talk-to-Unity/pull-request.yml?branch=main&label=Pull%20Request%20Validation)](https://github.com/UnityAILab/Talk-to-Unity/actions/workflows/pull-request.yml)
+Talk to Unity is a browser-based voice companion that connects visitors with the Unity AI Lab experience. The project ships as a static site, so it can be hosted on GitHub Pages or any web server that can serve HTML, CSS, and JavaScript.
 
-Automated workflows manage the Talk to Unity static site:
+## What you get
 
-- **Pull Request Validation** runs the test suite for every pull request event and publishes a summary with the outcome of each test file.
-- **Main Branch Workflow** builds the static assets, uploads them for GitHub Pages deployment, executes the tests again, and reports build and test summaries without blocking deployments.
+- A guided landing page with live dependency checks for secure context, speech recognition, speech synthesis, and microphone access.
+- A voice-first interface where users can unmute the microphone, talk to Unity, and hear spoken responses.
+- Lightweight assets that run fully in the browser with no additional backend services required.
 
-The current regression test asserts that the live deployment at [unityailab.com/Talk-to-Unity](http://www.unityailab.com/Talk-to-Unity) remains available and still renders the call-to-action button for microphone access.
+## Requirements
+
+To enjoy the full experience make sure you have:
+
+- A modern browser with support for the Web Speech APIs (Chrome or Edge work best, Safari on desktop also supports the features).
+- HTTPS hosting or `localhost` so the secure-context check passes.
+- Speakers or headphones so you can hear Unity’s replies.
+- A microphone that the browser is allowed to access.
+
+## Running locally
+
+1. Clone this repository.  
+   `git clone https://github.com/Unity-Lab-AI/Talk-to-Unity.git`
+2. Serve the files from a local web server so the secure-context requirement is satisfied. Any simple static server works, for example:  
+   `python -m http.server 8000`
+3. Visit `http://localhost:8000` in a compatible browser, open `index.html`, and follow the landing page instructions to launch the voice lab.
+
+## Project structure
+
+- `index.html` – landing page markup and the application shell.
+- `style.css` – theme styles for both the landing page and the voice interface.
+- `app.js` – dependency checks, voice controls, and Unity interaction logic.
+- `ai-instruct.txt` – system prompt loaded by the application.
+
+## Helpful links
+
+- Unity AI Lab home: https://unityailab.online
+- Repository on GitHub: https://github.com/Unity-Lab-AI/Talk-to-Unity
+
+Feel free to customize the landing copy, extend the dependency checks, or swap in different voice prompts to match your own deployment.

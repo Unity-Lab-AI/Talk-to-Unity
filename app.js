@@ -21,6 +21,9 @@ const bodyElement = document.body;
 if (bodyElement) {
     bodyElement.classList.remove('no-js');
     bodyElement.classList.add('js-enabled');
+    if (!bodyElement.dataset.appState) {
+        bodyElement.dataset.appState = 'landing';
+    }
 }
 
 let currentImageModel = 'flux';
@@ -33,13 +36,15 @@ let currentHeroUrl = '';
 let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
+let appStarted = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
 const dependencyChecks = [
     {
         id: 'secure-context',
-        label: 'Secure context (HTTPS or localhost)',
+        label: 'Secure connection (HTTPS or localhost)',
+        friendlyName: 'secure connection light',
         check: () =>
             Boolean(window.isSecureContext) ||
             /^localhost$|^127(?:\.\d{1,3}){3}$|^\[::1\]$/.test(window.location.hostname)
@@ -47,16 +52,19 @@ const dependencyChecks = [
     {
         id: 'speech-recognition',
         label: 'Web Speech Recognition API',
+        friendlyName: 'speech listening light',
         check: () => Boolean(SpeechRecognition)
     },
     {
         id: 'speech-synthesis',
         label: 'Speech synthesis voices',
+        friendlyName: 'talk-back voice light',
         check: () => typeof synth !== 'undefined' && typeof synth.speak === 'function'
     },
     {
         id: 'microphone',
         label: 'Microphone access',
+        friendlyName: 'microphone light',
         check: () => Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
     }
 ];
@@ -176,17 +184,18 @@ function updateDependencyUI(results, allMet, { announce = false } = {}) {
         const unmet = results.filter((result) => !result.met);
         if (unmet.length === 0) {
             dependencySummary.textContent =
-                'All systems are ready. Launch the Voice Lab to begin your Unity AI conversation.';
+                'All the lights are green! Press "Launch Unity Voice Lab" to start chatting.';
         } else {
-            const firstMissing = unmet[0]?.label ?? 'the required capabilities';
-            dependencySummary.textContent = `Resolve ${firstMissing} and re-run the check.`;
+            const firstMissing = unmet[0];
+            const friendlyName = firstMissing?.friendlyName ?? firstMissing?.label ?? 'missing light';
+            dependencySummary.textContent = `The ${friendlyName} is still red. Follow the tip below, then press "Check again."`;
         }
     }
 
     if (announce && !allMet) {
         const missingNames = results
             .filter((result) => !result.met)
-            .map((result) => result.label)
+            .map((result) => result.friendlyName ?? result.label)
             .join(', ');
 
         if (missingNames) {
