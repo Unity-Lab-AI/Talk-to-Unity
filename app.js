@@ -12,6 +12,7 @@ let isMuted = true;
 let hasMicPermission = false;
 let currentBackgroundUrl = '';
 let pendingBackgroundUrl = '';
+let currentTheme = 'dark';
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
@@ -55,6 +56,7 @@ window.addEventListener('load', async () => {
     setupSpeechRecognition();
     updateMuteIndicator();
     await initializeVoiceControl();
+    applyTheme(currentTheme, { force: true });
 });
 
 function setCircleState(circle, { speaking = false, listening = false, error = false, label = '' } = {}) {
@@ -321,22 +323,52 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+function isLikelyUrlSegment(segment) {
+    if (typeof segment !== 'string' || segment.trim() === '') {
+        return false;
+    }
+
+    const cleaned = segment
+        .replace(/^[<(\[]+/g, '')
+        .replace(/[>\])]+$/g, '')
+        .replace(/[.,!?;:]+$/g, '')
+        .trim()
+        .toLowerCase();
+
+    if (cleaned === '') {
+        return false;
+    }
+
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('www.')) {
+        return true;
+    }
+
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#].*)?$/.test(cleaned)) {
+        return true;
+    }
+
+    return false;
+}
+
 function sanitizeForSpeech(text) {
     if (typeof text !== 'string') {
         return '';
     }
 
-    const withoutUrls = text
-        .replace(/\bhttps?:\/\/\S+/gi, '')
-        .replace(/\bwww\.[^\s]+/gi, '');
+    const parts = text.split(/(\s+)/);
+    const sanitizedParts = parts.map((part) => (isLikelyUrlSegment(part) ? '' : part));
+    const sanitized = sanitizedParts.join('').replace(/\s{2,}/g, ' ').trim();
 
-    return withoutUrls.replace(/\s{2,}/g, ' ').trim();
+    return sanitized;
 }
 
 function speak(text) {
     if (synth.speaking) {
-        console.error('Speech synthesis is already speaking.');
-        return;
+        synth.cancel();
+        setCircleState(aiCircle, {
+            speaking: false,
+            label: 'Unity is idle'
+        });
     }
 
     const sanitizedText = sanitizeForSpeech(text);
@@ -374,6 +406,17 @@ function speak(text) {
     };
 
     synth.speak(utterance);
+}
+
+function applyTheme(theme, { force = false } = {}) {
+    const normalizedTheme = theme === 'light' ? 'light' : 'dark';
+
+    if (!force && normalizedTheme === currentTheme) {
+        return;
+    }
+
+    currentTheme = normalizedTheme;
+    document.documentElement.dataset.theme = normalizedTheme;
 }
 
 function handleVoiceCommand(command) {
@@ -457,10 +500,37 @@ function handleVoiceCommand(command) {
     if (
         lowerCaseCommand.includes('clear history') ||
         lowerCaseCommand.includes('delete history') ||
-        lowerCaseCommand.includes('clear chat')
+        lowerCaseCommand.includes('clear chat') ||
+        lowerCaseCommand.includes('clear chat history')
     ) {
         chatHistory = [];
         speak('Chat history cleared.');
+        return true;
+    }
+
+    if (
+        lowerCaseCommand.includes('light mode') ||
+        lowerCaseCommand.includes('light theme') ||
+        lowerCaseCommand.includes('change to light') ||
+        lowerCaseCommand.includes('switch to light') ||
+        lowerCaseCommand.includes('change them to light')
+    ) {
+        const wasUpdated = currentTheme !== 'light';
+        applyTheme('light');
+        speak(wasUpdated ? 'Switched to the light theme.' : 'Light theme is already active.');
+        return true;
+    }
+
+    if (
+        lowerCaseCommand.includes('dark mode') ||
+        lowerCaseCommand.includes('dark theme') ||
+        lowerCaseCommand.includes('change to dark') ||
+        lowerCaseCommand.includes('switch to dark') ||
+        lowerCaseCommand.includes('change them to dark')
+    ) {
+        const wasUpdated = currentTheme !== 'dark';
+        applyTheme('dark');
+        speak(wasUpdated ? 'Switched to the dark theme.' : 'Dark theme is already active.');
         return true;
     }
 
