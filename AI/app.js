@@ -766,12 +766,12 @@ function removeCommandArtifacts(value) {
     }
 
     let result = value
-        .replace(/\?\[[^\\\]]*\bcommand\b[^\\\]]*\]/gi, ' ')
-        .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
+        .replace(/\?\[[^\\]*command[^\\]*\]/gi, ' ')
+        .replace(/\([^)]*command[^)]*\/gi, ' ')
         .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
-        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+\b/gi, ' ')
-        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+\b/gi, ' ')
-        .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*\b/gi, ' ')
+        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
         .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
 
     result = result.replace(/^\s*[-*]?\s*(?:command|action)[^\n]*$/gim, ' ');
@@ -795,8 +795,8 @@ function sanitizeForSpeech(text) {
         .replace(/\bcommand\s*\([^)]*\)/gi, ' ');
 
     const withoutPollinations = withoutDirectives
-        .replace(/https?:\/\/\S*images? \.pollinations\.ai\S*/gi, '')
-        .replace(/\b\S*images? \.pollinations\.ai\S*\b/gi, '');
+        .replace(/https?:\/\/\S*images?\s*\.pollinations\.ai\S*/gi, '')
+        .replace(/\b\S*images?\s*\.pollinations\.ai\S*\b/gi, '');
 
     const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
     const withoutCommands = removeCommandArtifacts(withoutMarkdownTargets);
@@ -806,14 +806,12 @@ function sanitizeForSpeech(text) {
         .replace(/\bwww\.[^\s)]+/gi, ' ');
 
     const withoutSpacedUrls = withoutGenericUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*[\w\-.
-/?%#&=]+/gi, ' ')
+        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*[\w\-.\n/?%#&=]+/gi, ' ')
         .replace(/\bhttps?\b/gi, ' ')
         .replace(/\bwww\b/gi, ' ');
 
     const withoutSpelledUrls = withoutSpacedUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*(?:[:=]|colon)\s*\/\s*\/\s*[\w\-.
-/?%#&=]+/gi, ' ')
+        .replace(/h\s*t\s*t\s*p\s*s?\s*(?:[:=]|colon)\s*\/\s*\/\s*[\w\-.\n/?%#&=]+/gi, ' ')
         .replace(/\b(?:h\s*t\s*t\s*p\s*s?|h\s*t\s*t\s*p)\b/gi, ' ')
         .replace(/\bcolon\b/gi, ' ')
         .replace(/\bslash\b/gi, ' ');
@@ -881,8 +879,8 @@ function sanitizeImageUrl(rawUrl) {
 
     return rawUrl
         .trim()
-        .replace(/^["'<\\\[({]+/g, '')
-        .replace(/["'>)\\]}]+$/g, '')
+        .replace(/^["'<\\\\[({]+/g, '')
+        .replace(/["'>)\\\]}]+$/g, '')
         .replace(/[,.;!]+$/g, '');
 }
 
@@ -1011,7 +1009,7 @@ function extractImageUrl(text) {
 }
 
 function escapeRegExp(value) {
-    return value.replace(/[-/\\^$*+?.()|[\\\]{}]/g, '\\$&');
+    return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
 function removeImageReferences(text, imageUrl) {
