@@ -440,8 +440,11 @@ function sanitizeForSpeech(text) {
         return '';
     }
 
+    const withoutPollinations = text
+        .replace(/https?:\/\/\S*image\.pollinations\.ai\S*/gi, '')
+        .replace(/\b\S*image\.pollinations\.ai\S*\b/gi, '');
 
-    const parts = text.split(/(\s+)/);
+    const parts = withoutPollinations.split(/(\s+)/);
     const sanitizedParts = parts.map((part) => (isLikelyUrlSegment(part) ? '' : part));
     const sanitized = sanitizedParts.join('').replace(/\s{2,}/g, ' ').trim();
 
