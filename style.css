@@ -24,7 +24,7 @@ body {
     color: var(--text-color);
     display: flex;
     justify-content: center;
-    align-items: stretch;
+    align-items: center;
     width: 100%;
     position: relative;
 }
@@ -36,20 +36,19 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: clamp(24px, 6vh, 64px);
     padding: clamp(16px, 4vh, 32px) clamp(16px, 6vw, 80px) clamp(24px, 6vh, 80px);
 }
 
 #hero-stage {
-    position: fixed;
-    inset: 0;
+    width: min(960px, 100%);
     display: flex;
     justify-content: center;
-    align-items: flex-start;
-    margin: 0;
+    align-items: center;
+    margin: clamp(16px, 5vh, 48px) auto clamp(8px, 3vh, 24px);
     pointer-events: none;
-    z-index: 20;
     opacity: 0;
     transition: opacity 0.5s ease;
 }
@@ -59,8 +58,7 @@ body {
 }
 
 #hero-stage img {
-    position: relative;
-    max-width: min(960px, 90vw);
+    max-width: min(720px, 90vw);
     width: 100%;
     height: auto;
     object-fit: contain;
@@ -84,8 +82,10 @@ body {
     width: 100%;
     flex: 1;
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
+    gap: clamp(24px, 8vh, 72px);
     position: relative;
     z-index: 2;
     padding-bottom: clamp(8px, 3vh, 24px);
@@ -94,7 +94,7 @@ body {
 .voice-stage {
     display: flex;
     justify-content: center;
-    align-items: flex-end;
+    align-items: center;
     gap: clamp(24px, 14vw, 140px);
     width: min(960px, 100%);
 }

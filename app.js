@@ -1103,8 +1103,11 @@ function updateHeroImage(imageUrl) {
     heroStage.classList.add('is-visible');
 
     if (imageUrl === currentHeroUrl && heroStage.dataset.state === 'loaded') {
+        heroStage.setAttribute('aria-hidden', heroStage.classList.contains('has-image') ? 'false' : 'true');
         return;
     }
+
+    heroStage.setAttribute('aria-hidden', 'true');
 
     const hadImage = heroStage.classList.contains('has-image');
 
@@ -1129,6 +1132,7 @@ function updateHeroImage(imageUrl) {
         heroImage.src = imageUrl;
         heroStage.dataset.state = 'loaded';
         heroStage.classList.add('has-image');
+        heroStage.setAttribute('aria-hidden', 'false');
     };
 
     image.onerror = (error) => {
@@ -1139,8 +1143,10 @@ function updateHeroImage(imageUrl) {
             heroStage.dataset.state = 'error';
             heroStage.classList.remove('has-image');
             heroImage.removeAttribute('src');
+            heroStage.setAttribute('aria-hidden', 'true');
         } else {
             heroStage.dataset.state = 'loaded';
+            heroStage.setAttribute('aria-hidden', 'false');
         }
         console.error('Failed to load hero image:', error);
     };
