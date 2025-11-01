@@ -413,22 +413,22 @@ function isLikelyUrlSegment(segment) {
     }
 
     const cleaned = segment
-        .replace(/^[<(\[]+/g, '')
-        .replace(/[>\])]+$/g, '')
+        .replace(/^[<({\[\s'"“”‘’`]+/g, '')
+        .replace(/[>)}\]\s'"“”‘’`]+$/g, '')
         .replace(/[.,!?;:]+$/g, '')
-        .trim()
-        .toLowerCase();
+        .trim();
 
     if (cleaned === '') {
         return false;
     }
 
-    if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('www.')) {
+    const normalized = cleaned.toLowerCase();
+
+    if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('www.')) {
         return true;
     }
 
-    if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#].*)?$/.test(cleaned)) {
-
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#].*)?$/.test(normalized)) {
         return true;
     }
 
@@ -446,7 +446,14 @@ function sanitizeForSpeech(text) {
 
     const parts = withoutPollinations.split(/(\s+)/);
     const sanitizedParts = parts.map((part) => (isLikelyUrlSegment(part) ? '' : part));
-    const sanitized = sanitizedParts.join('').replace(/\s{2,}/g, ' ').trim();
+    const sanitized = sanitizedParts
+        .join('')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\s+([.,!?;:])/g, '$1')
+        .replace(/\(\s*\)/g, '')
+        .replace(/\[\s*\]/g, '')
+        .replace(/\{\s*\}/g, '')
+        .trim();
 
     return sanitized;
 }
@@ -632,7 +639,37 @@ function handleVoiceCommand(command) {
 }
 
 const POLLINATIONS_TEXT_URL = 'https://text.pollinations.ai/openai';
+const POLLINATIONS_IMAGE_BASE_URL = 'https://image.pollinations.ai/prompt/';
+const POLLINATIONS_IMAGE_REFERRER = 'unityailab.com';
 const UNITY_REFERRER = 'https://www.unityailab.com/';
+
+function generateImageSeed() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function buildImageUrl(prompt) {
+    if (typeof prompt !== 'string') {
+        return '';
+    }
+
+    const trimmedPrompt = prompt.trim();
+
+    if (!trimmedPrompt) {
+        return '';
+    }
+
+    const params = new URLSearchParams({
+        height: '512',
+        width: '512',
+        private: 'true',
+        enhance: 'true',
+        seed: generateImageSeed(),
+        model: currentImageModel,
+        referrer: POLLINATIONS_IMAGE_REFERRER
+    });
+
+    return `${POLLINATIONS_IMAGE_BASE_URL}${encodeURIComponent(trimmedPrompt)}?${params.toString()}`;
+}
 
 function shouldUseUnityReferrer() {
     if (typeof window === 'undefined') {
@@ -737,10 +774,10 @@ async function getAIResponse(userInput) {
     }
 
     try {
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-            userInput
-        )}?model=${currentImageModel}&referrer=unityailab.com`;
-        updateBackgroundImage(imageUrl);
+        const imageUrl = buildImageUrl(userInput);
+        if (imageUrl) {
+            updateBackgroundImage(imageUrl);
+        }
     } catch (error) {
         console.error('Error getting image from Pollinations AI:', error);
     }
