@@ -322,14 +322,14 @@ body[data-app-state='experience'] #landing {
     box-shadow: 0 0 0 2px rgba(26, 10, 0, 0.5), 0 12px 30px rgba(244, 114, 22, 0.32);
 }
 
-.dependency-light[data-state='warn'] {
-    background: linear-gradient(135deg, var(--accent-amber), #b45309);
-    box-shadow: 0 0 0 2px rgba(26, 10, 0, 0.55), 0 12px 30px rgba(244, 114, 22, 0.36);
+.dependency-light[data-state='fail'] {
+    background: linear-gradient(135deg, var(--accent-red), #7f1d1d);
+    box-shadow: 0 0 0 2px rgba(40, 0, 0, 0.55), 0 12px 30px rgba(255, 62, 62, 0.38);
 }
 
-.dependency-item[data-state='warn'] .dependency-name::before {
-    background: linear-gradient(135deg, var(--accent-amber), #b45309);
-    box-shadow: 0 0 0 2px rgba(26, 10, 0, 0.55), 0 8px 22px rgba(244, 114, 22, 0.28);
+.dependency-item[data-state='fail'] .dependency-name::before {
+    background: linear-gradient(135deg, var(--accent-red), #7f1d1d);
+    box-shadow: 0 0 0 2px rgba(40, 0, 0, 0.55), 0 8px 22px rgba(255, 62, 62, 0.28);
 }
 
 .dependency-light[data-state='pass'] {
@@ -396,11 +396,17 @@ body[data-app-state='experience'] #landing {
     color: rgba(255, 210, 210, 0.78);
 }
 
-.dependency-instructions {
+.dependency-message {
     margin: 0 0 8px;
     color: rgba(255, 225, 225, 0.82);
     line-height: 1.7;
     font-size: 0.98rem;
+    display: none;
+}
+
+.dependency-item[data-state='pass'] .dependency-message[data-message-type='pass'],
+.dependency-item[data-state='fail'] .dependency-message[data-message-type='fail'] {
+    display: block;
 }
 
 .landing-actions {
@@ -821,9 +827,3 @@ body.no-js .mute-indicator {
         scroll-behavior: auto !important;
     }
 }
-.dependency-reminder {
-    margin: 0;
-    color: rgba(255, 200, 200, 0.75);
-    font-size: 0.9rem;
-}
-

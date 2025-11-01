@@ -44,7 +44,10 @@ def test_landing_page_structure():
         assert statuses.count() == 4
         for idx in range(statuses.count()):
             status_text = statuses.nth(idx).inner_text().strip().lower()
-            assert status_text in {"checking…", "checking...", "ready", "check settings"}
+            normalized = status_text.replace("—", "-")
+            if normalized.startswith("checking"):
+                continue
+            assert normalized.startswith("ready") or normalized.startswith("fix")
 
         launch_button = page.locator("#launch-app")
         assert launch_button.inner_text().strip() == "Talk to Unity"

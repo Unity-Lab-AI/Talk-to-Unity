@@ -55,6 +55,18 @@ function formatDependencyList(items) {
     return `${head} and ${tail}`;
 }
 
+function getDependencyStatuses(item) {
+    if (!item) {
+        return {
+            passStatus: 'Ready',
+            failStatus: 'Check settings'
+        };
+    }
+
+    const { passStatus = 'Ready', failStatus = 'Check settings' } = item.dataset;
+    return { passStatus, failStatus };
+}
+
 function setStatusMessage(message, tone = 'info') {
     if (!statusMessage) {
         return;
@@ -196,24 +208,25 @@ function updateDependencyUI(results, allMet, { announce = false, missing = [] } 
                 return;
             }
 
-            item.dataset.state = result.met ? 'pass' : 'warn';
+            item.dataset.state = result.met ? 'pass' : 'fail';
             const statusElement = item.querySelector('.dependency-status');
             if (statusElement) {
-                statusElement.textContent = result.met ? 'Ready' : 'Check settings';
+                const { passStatus, failStatus } = getDependencyStatuses(item);
+                statusElement.textContent = result.met ? passStatus : failStatus;
             }
         });
     }
 
     if (dependencyLight) {
-        dependencyLight.dataset.state = allMet ? 'pass' : 'warn';
+        dependencyLight.dataset.state = allMet ? 'pass' : 'fail';
         const summary = formatDependencyList(missing);
         dependencyLight.setAttribute(
             'aria-label',
             allMet
                 ? 'All dependencies satisfied'
                 : summary
-                ? `Compatibility mode enabled because ${summary} is unavailable`
-                : 'Compatibility mode enabled. Some requirements are missing'
+                ? `Missing requirements: ${summary}`
+                : 'Missing one or more requirements'
         );
     }
 
@@ -223,8 +236,8 @@ function updateDependencyUI(results, allMet, { announce = false, missing = [] } 
         } else {
             const summary = formatDependencyList(missing);
             dependencySummary.textContent = summary
-                ? `We spotted a few red lights (${summary}). Talk to Unity will still launch, but those features may be limited until they turn green.`
-                : 'We spotted a few red lights. Talk to Unity will still launch, but some features may be limited.';
+                ? `Red lights: ${summary}. Follow the fix steps below, then press "Check again."`
+                : 'Red lights detected. Follow the fix steps below, then press "Check again."';
         }
     }
 

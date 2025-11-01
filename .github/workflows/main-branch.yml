@@ -29,5 +29,10 @@ jobs:
       - name: Install Playwright browsers
         run: python -m playwright install --with-deps chromium
 
+      - name: Clean up Python bytecode
+        run: |
+          find . -type d -name "__pycache__" -exec rm -rf {} +
+          find . -name "*.pyc" -delete
+
       - name: Run tests
         run: pytest
