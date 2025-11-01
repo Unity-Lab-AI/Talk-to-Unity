@@ -74,53 +74,77 @@
             </div>
 
             <ul id="dependency-list" class="dependency-list">
-                <li class="dependency-item" data-dependency="secure-context" data-state="pending">
+                <li
+                    class="dependency-item"
+                    data-dependency="secure-context"
+                    data-state="pending"
+                    data-pass-status="Ready — secure and private"
+                    data-fail-status="Fix: Use HTTPS or localhost"
+                >
                     <div class="dependency-header">
                         <span class="dependency-name">Secure connection (HTTPS or localhost)</span>
                         <span class="dependency-status">Checking…</span>
                     </div>
-                    <p class="dependency-instructions">
-                        If this light is red: look at the address bar at the top. The link should start with <code>https://</code> or say
-                        <code>localhost</code>. If it doesn’t, add the missing <code>https://</code> or open the site from our secure Unity AI Lab page.
-                        It’s just like buckling a seatbelt so everything stays safe.
+                    <p class="dependency-message" data-message-type="pass">
+                        Secure connection detected. Unity can safely access the microphone and speech features.
                     </p>
-                    <p class="dependency-reminder">After you fix it, press the big “Check again” button.</p>
+                    <p class="dependency-message" data-message-type="fail">
+                        Open this page with <code>https://</code> or from <code>localhost</code>, then press “Check again.”
+                    </p>
                 </li>
-                <li class="dependency-item" data-dependency="speech-recognition" data-state="pending">
+                <li
+                    class="dependency-item"
+                    data-dependency="speech-recognition"
+                    data-state="pending"
+                    data-pass-status="Ready — Unity can listen"
+                    data-fail-status="Fix: Switch to a supported browser"
+                >
                     <div class="dependency-header">
                         <span class="dependency-name">Web Speech Recognition API</span>
                         <span class="dependency-status">Checking…</span>
                     </div>
-                    <p class="dependency-instructions">
-                        If this light is red: your browser can’t hear you yet. Open this page in the latest version of Google Chrome,
-                        Microsoft Edge, or another browser that supports talking and listening. Imagine switching to a friend who knows how
-                        to play the game.
+                    <p class="dependency-message" data-message-type="pass">
+                        Speech recognition is available. Unity will understand what you say.
                     </p>
-                    <p class="dependency-reminder">Switch browsers or update yours, then press “Check again.”</p>
+                    <p class="dependency-message" data-message-type="fail">
+                        Open this page in the latest Chrome or Edge, then press “Check again.”
+                    </p>
                 </li>
-                <li class="dependency-item" data-dependency="speech-synthesis" data-state="pending">
+                <li
+                    class="dependency-item"
+                    data-dependency="speech-synthesis"
+                    data-state="pending"
+                    data-pass-status="Ready — Unity can speak back"
+                    data-fail-status="Fix: Enable browser speech voices"
+                >
                     <div class="dependency-header">
                         <span class="dependency-name">Speech synthesis voices</span>
                         <span class="dependency-status">Checking…</span>
                     </div>
-                    <p class="dependency-instructions">
-                        If this light is red: the browser doesn’t know how to speak back. Make sure your speakers aren’t muted and that
-                        you’re using a browser with voice support (Chrome, Edge, or Safari on desktop works best). Refresh the page after
-                        turning the sound on.
+                    <p class="dependency-message" data-message-type="pass">
+                        Speech voices are ready. Unity can answer out loud through your speakers.
                     </p>
-                    <p class="dependency-reminder">When you’re ready, press “Check again” to retry.</p>
+                    <p class="dependency-message" data-message-type="fail">
+                        Use Chrome, Edge, or Safari with audio enabled, then press “Check again.”
+                    </p>
                 </li>
-                <li class="dependency-item" data-dependency="microphone" data-state="pending">
+                <li
+                    class="dependency-item"
+                    data-dependency="microphone"
+                    data-state="pending"
+                    data-pass-status="Ready — Microphone unlocked"
+                    data-fail-status="Fix: Allow microphone access"
+                >
                     <div class="dependency-header">
                         <span class="dependency-name">Microphone access</span>
                         <span class="dependency-status">Checking…</span>
                     </div>
-                    <p class="dependency-instructions">
-                        If this light is red: the browser needs permission to hear you. Look for a pop-up asking to use your microphone and
-                        click “Allow.” If you missed it, click the lock icon in the address bar and enable the microphone. It’s like giving a
-                        friend permission to listen to your story.
+                    <p class="dependency-message" data-message-type="pass">
+                        Microphone permission granted. Unity can hear your voice input.
                     </p>
-                    <p class="dependency-reminder">Press “Check again” after allowing the microphone.</p>
+                    <p class="dependency-message" data-message-type="fail">
+                        Click “Allow” on the microphone prompt or enable it in site settings, then press “Check again.”
+                    </p>
                 </li>
             </ul>
         </div>
