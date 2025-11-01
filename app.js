@@ -1055,18 +1055,21 @@ async function getAIResponse(userInput) {
 
         chatHistory.push({ role: 'assistant', content: chatAssistantMessage });
 
+        let heroImagePromise = Promise.resolve(false);
+        if (imageUrlFromResponse) {
+            heroImagePromise = updateHeroImage(imageUrlFromResponse);
+        }
+
         const shouldSuppressSpeech = commands.includes('shutup') || commands.includes('stop_speaking');
 
         if (!shouldSuppressSpeech) {
             const spokenText = sanitizeForSpeech(finalAssistantMessage);
             if (spokenText) {
+                await heroImagePromise;
                 speak(spokenText);
             }
         }
 
-        if (imageUrlFromResponse) {
-            updateHeroImage(imageUrlFromResponse);
-        }
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
         setCircleState(aiCircle, {
@@ -1097,14 +1100,14 @@ function getImageUrl() {
 
 function updateHeroImage(imageUrl) {
     if (!heroStage || !heroImage || !imageUrl) {
-        return;
+        return Promise.resolve(false);
     }
 
     heroStage.classList.add('is-visible');
 
     if (imageUrl === currentHeroUrl && heroStage.dataset.state === 'loaded') {
         heroStage.setAttribute('aria-hidden', heroStage.classList.contains('has-image') ? 'false' : 'true');
-        return;
+        return Promise.resolve(true);
     }
 
     heroStage.setAttribute('aria-hidden', 'true');
@@ -1118,40 +1121,45 @@ function updateHeroImage(imageUrl) {
         heroImage.removeAttribute('src');
     }
 
-    const image = new Image();
-    image.decoding = 'async';
-    image.referrerPolicy = 'no-referrer';
+    return new Promise((resolve) => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.referrerPolicy = 'no-referrer';
 
-    image.onload = () => {
-        if (pendingHeroUrl !== imageUrl) {
-            return;
-        }
+        image.onload = () => {
+            if (pendingHeroUrl !== imageUrl) {
+                resolve(false);
+                return;
+            }
 
-        currentHeroUrl = imageUrl;
-        pendingHeroUrl = '';
-        heroImage.src = imageUrl;
-        heroStage.dataset.state = 'loaded';
-        heroStage.classList.add('has-image');
-        heroStage.setAttribute('aria-hidden', 'false');
-    };
-
-    image.onerror = (error) => {
-        if (pendingHeroUrl === imageUrl) {
+            currentHeroUrl = imageUrl;
             pendingHeroUrl = '';
-        }
-        if (!hadImage) {
-            heroStage.dataset.state = 'error';
-            heroStage.classList.remove('has-image');
-            heroImage.removeAttribute('src');
-            heroStage.setAttribute('aria-hidden', 'true');
-        } else {
+            heroImage.src = imageUrl;
             heroStage.dataset.state = 'loaded';
+            heroStage.classList.add('has-image');
             heroStage.setAttribute('aria-hidden', 'false');
-        }
-        console.error('Failed to load hero image:', error);
-    };
+            resolve(true);
+        };
 
-    image.src = imageUrl;
+        image.onerror = (error) => {
+            if (pendingHeroUrl === imageUrl) {
+                pendingHeroUrl = '';
+            }
+            if (!hadImage) {
+                heroStage.dataset.state = 'error';
+                heroStage.classList.remove('has-image');
+                heroImage.removeAttribute('src');
+                heroStage.setAttribute('aria-hidden', 'true');
+            } else {
+                heroStage.dataset.state = 'loaded';
+                heroStage.setAttribute('aria-hidden', 'false');
+            }
+            console.error('Failed to load hero image:', error);
+            resolve(false);
+        };
+
+        image.src = imageUrl;
+    });
 }
 
 async function copyImageToClipboard() {
