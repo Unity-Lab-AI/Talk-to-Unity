@@ -252,13 +252,11 @@
 
         if (shouldAutoStartExperience) {
             void startApplication();
-        } else {
-            void startApplication({ auto: true });
         }
 
         launchButton?.addEventListener('click', () => {
-            const { allMet } = evaluateDependencies({ announce: true });
-            if (!allMet && !allowLaunchOverride) {
+            const result = evaluateDependencies({ announce: true });
+            if (!result.allMet && !allowLaunchOverride) {
                 allowLaunchOverride = true;
                 setLaunchButtonState(false);
 
@@ -272,7 +270,22 @@
                 return;
             }
 
-            void startApplication();
+            const launchMessage = result.allMet
+                ? 'All systems look good. Redirecting to Talk to Unity…'
+                : 'Launching Talk to Unity in compatibility mode. Some features may be limited.';
+
+            setStatusMessage(launchMessage, result.allMet ? 'success' : 'warning');
+
+            window.dispatchEvent(
+                new CustomEvent('talk-to-unity:launch', {
+                    detail: {
+                        allMet: result.allMet,
+                        missing: result.missing,
+                        results: result.results,
+                        mode: result.allMet ? 'standard' : 'compatibility'
+                    }
+                })
+            );
         });
 
         recheckButton?.addEventListener('click', () => {
