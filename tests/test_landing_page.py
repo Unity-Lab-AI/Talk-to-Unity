@@ -1,25 +1,7 @@
 from pathlib import Path
 
 import pytest
-
-try:
-    from playwright.sync_api import sync_playwright, Error
-except ImportError:  # pragma: no cover - Playwright may be absent or expose Error elsewhere
-    try:
-        from playwright.sync_api import sync_playwright  # type: ignore[no-redef]
-    except ImportError:
-        sync_playwright = None  # type: ignore[assignment]
-    try:
-        from playwright._impl._api_types import Error  # type: ignore[import-not-found]
-    except Exception:  # pragma: no cover - fallback when Error isn't exposed
-        Error = Exception  # type: ignore[assignment]
-
-
-if sync_playwright is None:  # type: ignore[name-defined]
-    pytest.skip(
-        "Playwright is not installed in this environment.",
-        allow_module_level=True,
-    )
+from playwright.sync_api import Error, sync_playwright
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
