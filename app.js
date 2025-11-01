@@ -23,12 +23,6 @@ if (bodyElement) {
     bodyElement.classList.add('js-enabled');
 }
 
-const bodyElement = document.body;
-if (bodyElement) {
-    bodyElement.classList.remove('no-js');
-    bodyElement.classList.add('js-enabled');
-}
-
 let currentImageModel = 'flux';
 let chatHistory = [];
 let systemPrompt = '';
