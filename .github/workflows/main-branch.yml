@@ -1,0 +1,83 @@
+name: Main Branch Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and Upload Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Prepare static site bundle
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          cp index.html dist/
+          cp landing.js dist/
+          cp style.css dist/
+          cp -R AI dist/AI
+          cp -R tests dist/tests
+          cp ai-instruct.txt dist/
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-site
+          path: dist
+
+  report-build:
+    name: Report Build Status
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Build Status
+        run: |
+          echo "Main branch build finished with status: ${{ needs.build.result }}"
+
+  tests:
+    name: Run Tests
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run Tests
+        run: pytest
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: static-site
+          path: dist
+      - name: Deploy to Pages
+        run: |
+          echo "Deployment placeholder - upload dist/ to GitHub Pages via existing automation."
+
+  report-tests:
+    name: Report Tests Statuses
+    needs: tests
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Tests Statuses
+        run: |
+          echo "Main branch tests completed with status: ${{ needs.tests.result }}"
