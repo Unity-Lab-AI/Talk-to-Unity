@@ -57,6 +57,7 @@ window.addEventListener('load', async () => {
     setupSpeechRecognition();
     updateMuteIndicator();
     await initializeVoiceControl();
+    applyTheme(currentTheme, { force: true });
 });
 
 async function setMutedState(muted, { announce = false } = {}) {
@@ -405,47 +406,29 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-function removeCommandTags(text) {
-    if (typeof text !== 'string') {
-        return '';
-    }
 
-    return text.replace(/\[(?:command|action):[^\]]+\]/gi, ' ');
-}
-
-function tokenLooksLikeUrl(token) {
-    if (!token) {
+function isLikelyUrlSegment(segment) {
+    if (typeof segment !== 'string' || segment.trim() === '') {
         return false;
     }
 
-    const trimmedToken = token.trim();
-
-    if (!trimmedToken) {
-        return false;
-    }
-
-    const sanitizedToken = trimmedToken
-        .replace(/^[([{<'"`]+/, '')
-        .replace(/[)\]>'"`.,!?;:]+$/g, '')
+    const cleaned = segment
+        .replace(/^[<(\[]+/g, '')
+        .replace(/[>\])]+$/g, '')
+        .replace(/[.,!?;:]+$/g, '')
+        .trim()
         .toLowerCase();
 
-    if (!sanitizedToken) {
+    if (cleaned === '') {
         return false;
     }
 
-    if (sanitizedToken.startsWith('http://') || sanitizedToken.startsWith('https://')) {
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://') || cleaned.startsWith('www.')) {
         return true;
     }
 
-    if (sanitizedToken.startsWith('www.')) {
-        return true;
-    }
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#].*)?$/.test(cleaned)) {
 
-    if (sanitizedToken.includes('://')) {
-        return true;
-    }
-
-    if (sanitizedToken.includes('.') && sanitizedToken.includes('/') && /^[a-z0-9_./-]+$/i.test(sanitizedToken)) {
         return true;
     }
 
@@ -457,18 +440,21 @@ function sanitizeForSpeech(text) {
         return '';
     }
 
-    const withoutCommands = removeCommandTags(text);
 
-    const sanitizedTokens = withoutCommands
-        .split(/\s+/)
-        .filter((token) => token && !tokenLooksLikeUrl(token));
+    const parts = text.split(/(\s+)/);
+    const sanitizedParts = parts.map((part) => (isLikelyUrlSegment(part) ? '' : part));
+    const sanitized = sanitizedParts.join('').replace(/\s{2,}/g, ' ').trim();
 
-    return sanitizedTokens.join(' ').trim();
+    return sanitized;
 }
 
 function speak(text) {
     if (synth.speaking) {
         synth.cancel();
+        setCircleState(aiCircle, {
+            speaking: false,
+            label: 'Unity is idle'
+        });
     }
 
     const sanitizedText = sanitizeForSpeech(text);
@@ -508,71 +494,16 @@ function speak(text) {
     synth.speak(utterance);
 }
 
-function parseAiDirectives(text) {
-    if (typeof text !== 'string') {
-        return { cleanedText: '', commands: [] };
-    }
 
-    const commands = [];
-    const directivePattern = /\[(?:command|action):([a-z-]+)\]|<(?:command|action):([a-z-]+)>/gi;
+function applyTheme(theme, { force = false } = {}) {
+    const normalizedTheme = theme === 'light' ? 'light' : 'dark';
 
-    const cleanedText = text.replace(directivePattern, (_, squareMatch, angleMatch) => {
-        const commandName = (squareMatch || angleMatch || '').toLowerCase();
-        if (commandName) {
-            commands.push(commandName);
-        }
-
-        return ' ';
-    });
-
-    return {
-        cleanedText: cleanedText.replace(/\s{2,}/g, ' ').trim(),
-        commands
-    };
-}
-
-async function executeAiCommand(command) {
-    if (!command) {
+    if (!force && normalizedTheme === currentTheme) {
         return;
     }
 
-    const normalizedCommand = command.trim().toLowerCase();
-
-    switch (normalizedCommand) {
-        case 'mute':
-            await setMutedState(true, { announce: false });
-            break;
-        case 'unmute':
-            await setMutedState(false, { announce: false });
-            break;
-        case 'shutup':
-            synth.cancel();
-            setCircleState(aiCircle, {
-                speaking: false,
-                label: 'Unity is idle'
-            });
-            break;
-        case 'copy-image':
-            await copyImageToClipboard();
-            break;
-        case 'save-image':
-            await saveImage();
-            break;
-        case 'open-image':
-            openImageInNewTab();
-            break;
-        case 'clear-chat':
-            chatHistory = [];
-            break;
-        case 'light-mode':
-            applyTheme('light');
-            break;
-        case 'dark-mode':
-            applyTheme('dark');
-            break;
-        default:
-            break;
-    }
+    currentTheme = normalizedTheme;
+    document.documentElement.dataset.theme = normalizedTheme;
 }
 
 function handleVoiceCommand(command) {
@@ -661,10 +592,36 @@ function handleVoiceCommand(command) {
         lowerCaseCommand.includes('clear history') ||
         lowerCaseCommand.includes('delete history') ||
         lowerCaseCommand.includes('clear chat') ||
-        lowerCaseCommand.includes('clear hisstory')
+        lowerCaseCommand.includes('clear chat history')
     ) {
         chatHistory = [];
         speak('Chat history cleared.');
+        return true;
+    }
+
+    if (
+        lowerCaseCommand.includes('light mode') ||
+        lowerCaseCommand.includes('light theme') ||
+        lowerCaseCommand.includes('change to light') ||
+        lowerCaseCommand.includes('switch to light') ||
+        lowerCaseCommand.includes('change them to light')
+    ) {
+        const wasUpdated = currentTheme !== 'light';
+        applyTheme('light');
+        speak(wasUpdated ? 'Switched to the light theme.' : 'Light theme is already active.');
+        return true;
+    }
+
+    if (
+        lowerCaseCommand.includes('dark mode') ||
+        lowerCaseCommand.includes('dark theme') ||
+        lowerCaseCommand.includes('change to dark') ||
+        lowerCaseCommand.includes('switch to dark') ||
+        lowerCaseCommand.includes('change them to dark')
+    ) {
+        const wasUpdated = currentTheme !== 'dark';
+        applyTheme('dark');
+        speak(wasUpdated ? 'Switched to the dark theme.' : 'Dark theme is already active.');
         return true;
     }
 
