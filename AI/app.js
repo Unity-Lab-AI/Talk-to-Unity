@@ -33,6 +33,7 @@ let currentHeroUrl = '';
 let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
+let appStarted = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
@@ -1340,6 +1341,12 @@ async function getAIResponse(userInput) {
             }
         }
 
+        return {
+            text: finalAssistantMessage,
+            rawText: aiText,
+            imageUrl: selectedImageUrl,
+            commands
+        };
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
         setCircleState(aiCircle, {
@@ -1353,6 +1360,8 @@ async function getAIResponse(userInput) {
                 label: 'Unity is idle'
             });
         }, 2400);
+
+        return { error };
     }
 }
 
@@ -1487,5 +1496,32 @@ function openImageInNewTab() {
 if (!launchButton && !landingSection) {
     startApplication().catch((error) => {
         console.error('Failed to auto-start the Unity voice experience:', error);
+    });
+}
+
+if (typeof window !== 'undefined') {
+    const setMutedStateHandler = setMutedState;
+    window.setMutedState = (muted, options) => setMutedStateHandler(muted, options);
+
+    Object.defineProperty(window, '__unityTestHooks', {
+        value: {
+            isAppReady: () => appStarted,
+            getChatHistory: () => chatHistory.map((entry) => ({ ...entry })),
+            getCurrentHeroImage: () => getImageUrl(),
+            setHeroImage: (dataUrl) => updateHeroImage(dataUrl),
+            sendUserInput: async (input) => {
+                if (typeof input !== 'string' || !input.trim()) {
+                    return { error: new Error('Input must be a non-empty string.') };
+                }
+
+                if (!appStarted) {
+                    await startApplication();
+                }
+
+                return getAIResponse(input.trim());
+            }
+        },
+        configurable: true,
+        enumerable: false
     });
 }
