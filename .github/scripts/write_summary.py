@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -87,13 +88,37 @@ def append_summary(sections: list[list[str]]) -> None:
             handle.write(text + "\n")
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Aggregate CI results into a GitHub Actions step summary.",
+    )
+    parser.add_argument(
+        "--include-tests",
+        action="store_true",
+        help="Include the tests section in the summary.",
+    )
+    parser.add_argument(
+        "--include-build",
+        action="store_true",
+        help="Include the build section in the summary.",
+    )
+    args = parser.parse_args()
+    if not args.include_tests and not args.include_build:
+        args.include_tests = True
+        args.include_build = True
+    return args
+
+
 def main() -> None:
+    args = parse_args()
     repo_root = Path(".")
     tests_data = load_json(repo_root / "test-results.json")
     build_data = load_json(repo_root / "build-results.json")
 
-    sections: list[list[str]] = [render_tests_section(tests_data)]
-    if build_data or (repo_root / "build-results.json").exists():
+    sections: list[list[str]] = []
+    if args.include_tests:
+        sections.append(render_tests_section(tests_data))
+    if args.include_build and (build_data or (repo_root / "build-results.json").exists()):
         sections.append(render_build_section(build_data))
 
     append_summary(sections)
