@@ -273,7 +273,7 @@ async function startApplication() {
 
     applyTheme(currentTheme);
     await loadSystemPrompt();
-    setupSpeechRecognition();
+    await setupSpeechRecognition();
     updateMuteIndicator();
     await initializeVoiceControl();
     applyTheme(currentTheme, { force: true });
