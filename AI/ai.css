@@ -1,0 +1,21 @@
+:root,
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    --border-color: rgba(255, 255, 255, 0.2);
+    --text-color: #f3f3f3;
+    --muted-text: rgba(228, 228, 228, 0.78);
+    --surface-bg: rgba(18, 18, 18, 0.9);
+    --surface-highlight: rgba(26, 26, 26, 0.88);
+    --surface-border: rgba(255, 255, 255, 0.1);
+    --accent-red: #4a90e2; /* A neutral blue as a replacement for red */
+    --accent-red-soft: rgba(74, 144, 226, 0.6);
+    --accent-amber: #ff7a3e;
+    --accent-green: #34d399;
+    --glow-primary: rgba(74, 144, 226, 0.2);
+    --glow-secondary: rgba(255, 122, 62, 0.16);
+    --compat-warning: rgba(255, 174, 0, 0.18);
+}
+
+body {
+    background: #000;
+}

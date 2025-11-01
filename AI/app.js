@@ -1,4 +1,3 @@
-const landingSection = document.getElementById('landing');
 const appRoot = document.getElementById('app-root');
 const heroStage = document.getElementById('hero-stage');
 const heroImage = document.getElementById('hero-image');
@@ -6,12 +5,6 @@ const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
-const dependencyLight = document.querySelector('[data-role="dependency-light"]');
-const dependencySummary = document.getElementById('dependency-summary');
-const dependencyList = document.getElementById('dependency-list');
-const launchButton = document.getElementById('launch-app');
-const recheckButton = document.getElementById('recheck-dependencies');
-const statusMessage = document.getElementById('status-message');
 const assetBaseOverride = typeof window !== 'undefined' ? window.__talkToUnityAssetBase : '';
 const assetVersion = typeof window !== 'undefined' ? window.__talkToUnityAssetVersion : '';
 
@@ -29,19 +22,7 @@ if (bodyElement) {
     }
 }
 
-let currentImageModel = 'flux';
-let chatHistory = [];
-let systemPrompt = '';
-let recognition = null;
-let isMuted = true;
-let hasMicPermission = false;
-let currentHeroUrl = '';
-let pendingHeroUrl = '';
-let currentTheme = 'dark';
-let recognitionRestartTimeout = null;
 let appStarted = false;
-let allowLaunchOverride = false;
-let defaultLaunchLabel = '';
 let appShellReady = false;
 let systemPromptLoaded = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -49,132 +30,7 @@ const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined
 let compatibilityBanner = null;
 let dependencyState = { results: [], allMet: false, missing: [] };
 
-const dependencyChecks = [
-    {
-        id: 'secure-context',
-        label: 'Secure connection (HTTPS or localhost)',
-        friendlyName: 'secure connection light',
-        check: () =>
-            Boolean(window.isSecureContext) ||
-            /^localhost$|^127(?:\.\d{1,3}){3}$|^\[::1\]$/.test(window.location.hostname)
-    },
-    {
-        id: 'speech-recognition',
-        label: 'Web Speech Recognition API',
-        friendlyName: 'speech listening light',
-        check: () => Boolean(SpeechRecognition)
-    },
-    {
-        id: 'speech-synthesis',
-        label: 'Speech synthesis voices',
-        friendlyName: 'talk-back voice light',
-        check: () => typeof synth !== 'undefined' && typeof synth.speak === 'function'
-    },
-    {
-        id: 'microphone',
-        label: 'Microphone access',
-        friendlyName: 'microphone light',
-        check: () => Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-    }
-];
 
-function formatDependencyList(items) {
-    const labels = items
-        .map((item) => item.friendlyName ?? item.label ?? item.id)
-        .filter(Boolean);
-
-    if (labels.length === 0) {
-        return '';
-    }
-
-    if (labels.length === 1) {
-        return labels[0];
-    }
-
-    const head = labels.slice(0, -1).join(', ');
-    const tail = labels[labels.length - 1];
-    return `${head} and ${tail}`;
-}
-
-function setStatusMessage(message, tone = 'info') {
-    if (!statusMessage) {
-        return;
-    }
-
-    statusMessage.textContent = message;
-    if (message) {
-        statusMessage.dataset.tone = tone;
-    } else {
-        delete statusMessage.dataset.tone;
-    }
-}
-
-function updateLaunchButtonState({ allMet, missing }) {
-    if (!launchButton) {
-        return;
-    }
-
-    launchButton.disabled = false;
-    launchButton.setAttribute('aria-disabled', 'false');
-    launchButton.dataset.state = allMet ? 'ready' : 'warn';
-
-    if (missing.length > 0) {
-        const summary = formatDependencyList(missing);
-        launchButton.title = `Talk to Unity with limited support: ${summary}`;
-    } else {
-        launchButton.removeAttribute('title');
-    }
-}
-
-function ensureCompatibilityBanner() {
-    if (compatibilityBanner) {
-        return compatibilityBanner;
-    }
-
-    const banner = document.createElement('div');
-    banner.className = 'compatibility-notice';
-    banner.setAttribute('role', 'status');
-    banner.setAttribute('aria-live', 'polite');
-
-    const statusBanner = appRoot?.querySelector('.status-banner');
-    if (statusBanner) {
-        statusBanner.append(banner);
-    } else if (appRoot) {
-        appRoot.prepend(banner);
-    }
-
-    compatibilityBanner = banner;
-    return compatibilityBanner;
-}
-
-function showRecheckInProgress() {
-    allowLaunchOverride = false;
-    setLaunchButtonState(false);
-    if (launchButton) {
-        launchButton.dataset.state = 'pending';
-    }
-
-    if (dependencyLight) {
-        dependencyLight.dataset.state = 'pending';
-        dependencyLight.setAttribute('aria-label', 'Re-checking requirements');
-    }
-
-    if (dependencySummary) {
-        dependencySummary.textContent = 'Re-checking your setup…';
-    }
-
-    if (dependencyList) {
-        dependencyList.querySelectorAll('.dependency-item').forEach((item) => {
-            item.dataset.state = 'pending';
-            const statusElement = item.querySelector('.dependency-status');
-            if (statusElement) {
-                statusElement.textContent = 'Checking…';
-            }
-        });
-    }
-
-    setStatusMessage('Running the readiness scan again…', 'info');
-}
 
 if (heroStage && !heroStage.dataset.state) {
     heroStage.dataset.state = 'empty';
@@ -235,150 +91,8 @@ function resolveAssetPath(relativePath) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    evaluateDependencies();
     void startApplication({ auto: true });
-
-    launchButton?.addEventListener('click', () => {
-        const { allMet } = evaluateDependencies({ announce: true });
-        if (!allMet && !allowLaunchOverride) {
-            allowLaunchOverride = true;
-            setLaunchButtonState(false);
-
-            if (statusMessage) {
-                const advisory =
-                    'Some requirements are still missing. Select “Talk to Unity (limited mode)” to continue with reduced functionality.';
-                statusMessage.textContent = statusMessage.textContent
-                    ? `${statusMessage.textContent} ${advisory}`
-                    : advisory;
-            }
-            return;
-        }
-
-        void startApplication();
-    });
-
-    recheckButton?.addEventListener('click', () => {
-        showRecheckInProgress();
-        evaluateDependencies({ announce: true });
-    });
 });
-
-window.addEventListener('focus', () => {
-    if (!appStarted) {
-        evaluateDependencies();
-    }
-});
-
-function setLaunchButtonState(allMet) {
-    if (!launchButton) {
-        return;
-    }
-
-    if (!defaultLaunchLabel) {
-        defaultLaunchLabel = launchButton.textContent?.trim() ?? 'Talk to Unity';
-    }
-
-    launchButton.disabled = false;
-    launchButton.setAttribute('aria-disabled', 'false');
-
-    if (allMet) {
-        allowLaunchOverride = false;
-        launchButton.textContent = defaultLaunchLabel;
-        launchButton.dataset.launchOverride = 'clear';
-        return;
-    }
-
-    launchButton.dataset.launchOverride = allowLaunchOverride ? 'ready' : 'required';
-    launchButton.textContent = allowLaunchOverride ? 'Talk to Unity (limited mode)' : defaultLaunchLabel;
-}
-
-function evaluateDependencies({ announce = false } = {}) {
-    const results = dependencyChecks.map((descriptor) => {
-        let met = false;
-        try {
-            met = Boolean(descriptor.check());
-        } catch (error) {
-            console.error(`Dependency check failed for ${descriptor.id}:`, error);
-        }
-
-        return {
-            ...descriptor,
-            met
-        };
-    });
-
-    const missing = results.filter((result) => !result.met);
-    const allMet = missing.length === 0;
-
-    dependencyState = { results, allMet, missing };
-
-    updateDependencyUI(results, allMet, { announce, missing });
-    updateLaunchButtonState({ allMet, missing });
-
-    setLaunchButtonState(allMet);
-
-    if (announce) {
-        if (allMet) {
-            setStatusMessage('All systems look good. Launching Talk to Unity…', 'success');
-        } else {
-            const summary = formatDependencyList(missing);
-            const message = summary
-                ? `Starting Talk to Unity in compatibility mode. Some features may be limited: ${summary}.`
-                : 'Starting Talk to Unity in compatibility mode. Some browser features may be limited.';
-            setStatusMessage(message, 'warning');
-            speak(message);
-        }
-    } else if (allMet && statusMessage?.textContent) {
-        setStatusMessage('');
-    }
-
-    return { results, allMet, missing };
-}
-
-function updateDependencyUI(results, allMet, { announce = false, missing = [] } = {}) {
-    if (dependencyList) {
-        results.forEach((result) => {
-            const item = dependencyList.querySelector(`[data-dependency="${result.id}"]`);
-            if (!item) {
-                return;
-            }
-
-            item.dataset.state = result.met ? 'pass' : 'warn';
-            const statusElement = item.querySelector('.dependency-status');
-            if (statusElement) {
-                statusElement.textContent = result.met ? 'Ready' : 'Check settings';
-            }
-        });
-    }
-
-    if (dependencyLight) {
-        dependencyLight.dataset.state = allMet ? 'pass' : 'warn';
-        const summary = formatDependencyList(missing);
-        dependencyLight.setAttribute(
-            'aria-label',
-            allMet
-                ? 'All dependencies satisfied'
-                : summary
-                ? `Compatibility mode enabled because ${summary} is unavailable`
-                : 'Compatibility mode enabled. Some requirements are missing'
-        );
-    }
-
-    if (dependencySummary) {
-        if (missing.length === 0) {
-            dependencySummary.textContent = 'All the lights are green! Press "Talk to Unity" to start chatting.';
-        } else {
-            const summary = formatDependencyList(missing);
-            dependencySummary.textContent = summary
-                ? `We spotted a few red lights (${summary}). Talk to Unity will still launch, but those features may be limited until they turn green.`
-                : 'We spotted a few red lights. Talk to Unity will still launch, but some features may be limited.';
-        }
-    }
-
-    if (!announce && !allMet) {
-        setStatusMessage('');
-    }
-}
 
 async function startApplication({ auto = false } = {}) {
     if (auto && appShellReady) {
@@ -400,12 +114,6 @@ async function startApplication({ auto = false } = {}) {
         bodyElement.dataset.appState = 'landing';
     }
 
-    if (!auto && landingSection) {
-        landingSection.setAttribute('aria-hidden', 'true');
-    } else if (auto) {
-        landingSection?.removeAttribute('aria-hidden');
-    }
-
     if (heroStage) {
         if (!heroStage.dataset.state) {
             heroStage.dataset.state = 'idle';
@@ -425,18 +133,6 @@ async function startApplication({ auto = false } = {}) {
     if (auto) {
         appShellReady = true;
         return;
-    }
-
-    const missing = dependencyState?.missing ?? [];
-    if (missing.length > 0) {
-        const banner = ensureCompatibilityBanner();
-        const summary = formatDependencyList(missing);
-        if (banner) {
-            banner.textContent = summary
-                ? `Compatibility mode active. Some features may be limited: ${summary}.`
-                : 'Compatibility mode active. Some features may be limited.';
-        }
-        setStatusMessage('');
     }
 
     await initializeVoiceControl();
@@ -621,30 +317,107 @@ async function loadSystemPrompt({ force = false } = {}) {
     }
 }
 
-function setupSpeechRecognition() {
-    if (!SpeechRecognition) {
-        console.warn('Speech recognition is not supported in this browser.');
-        setCircleState(userCircle, {
-            label: 'Speech recognition is not supported in this browser',
-            error: true
-        });
-        const banner = ensureCompatibilityBanner();
-        if (banner) {
-            banner.textContent = 'Compatibility mode active. Speech recognition is not supported in this browser.';
-        }
-        setStatusMessage('Compatibility mode active. Speech recognition is not supported in this browser.', 'warning');
-        return;
-    }
-
+async function setupSpeechRecognition() {
     if (recognition) {
         return;
     }
 
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    class WhisperRecognition {
+        constructor() {
+            this.continuous = true;
+            this.lang = 'en-US';
+            this.interimResults = false;
+            this.maxAlternatives = 1;
+            this.onstart = () => {};
+            this.onaudiostart = () => {};
+            this.onspeechstart = () => {};
+            this.onspeechend = () => {};
+            this.onend = () => {};
+            this.onresult = () => {};
+            this.onerror = () => {};
+
+            this.mediaRecorder = null;
+            this.audioChunks = [];
+            this.transcriber = null;
+            this.isTranscribing = false;
+        }
+
+        async init() {
+            const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1');
+            this.transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
+        }
+
+        start() {
+            if (!this.transcriber) {
+                this.onerror({ error: 'Transcriber not initialized.' });
+                return;
+            }
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    this.mediaRecorder.addEventListener('dataavailable', event => {
+                        this.audioChunks.push(event.data);
+                    });
+                    this.mediaRecorder.addEventListener('stop', async () => {
+                        if (this.isTranscribing) return;
+                        this.isTranscribing = true;
+
+                        const audioBlob = new Blob(this.audioChunks);
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        
+                        try {
+                            const result = await this.transcriber(audioUrl);
+                            const transcript = result.text.trim();
+                            const event = {
+                                results: [[{ transcript }]]
+                            };
+                            this.onresult(event);
+                        } catch (error) {
+                            this.onerror({ error });
+                        } finally {
+                            this.isTranscribing = false;
+                            this.audioChunks = [];
+                            URL.revokeObjectURL(audioUrl);
+                        }
+                    });
+                    this.mediaRecorder.start();
+                    this.onstart();
+                })
+                .catch(err => {
+                    this.onerror({ error: err });
+                });
+        }
+
+        stop() {
+            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                this.mediaRecorder.stop();
+            }
+            this.onend();
+        }
+    }
+    window.WhisperRecognition = WhisperRecognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+    } else {
+        try {
+            const whisperRecognition = new WhisperRecognition();
+            await whisperRecognition.init();
+            recognition = whisperRecognition;
+        } catch (error) {
+            console.error('Failed to create Whisper polyfill:', error);
+            setCircleState(userCircle, {
+                label: 'Speech recognition is not supported in this browser',
+                error: true
+            });
+            return;
+        }
+    }
 
     recognition.onstart = () => {
         console.log('Voice recognition started.');
@@ -777,10 +550,6 @@ async function requestMicPermission() {
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop());
-        setCircleState(userCircle, {
-            label: 'Microphone is muted'
-        });
         return true;
     } catch (error) {
         console.error('Microphone permission denied:', error);
@@ -910,26 +679,29 @@ function isLikelyUrlSegment(segment) {
 
 function removeMarkdownLinkTargets(value) {
     return value
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, altText, url) => {
+        .replace(/!\\[([^\\]*)].*\(([^)]+)\)/g, (_match, altText, url) => {
             return isLikelyUrlSegment(url) ? altText : _match;
         })
-        .replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_match, linkText, url) => {
+        .replace(/\\[([^\\]*)].*\(([^)]+)\)/g, (_match, linkText, url) => {
             return isLikelyUrlSegment(url) ? linkText : _match;
         })
-        .replace(/\[(?:command|action)[^\]]*\]\([^)]*\)/gi, ' ');
+        .replace(/\\[(?:command|action)[^\\]*].*\([^)]*\)/gi, ' ');
 }
 
+/*
 function removeCommandArtifacts(value) {
     if (typeof value !== 'string') {
         return '';
     }
 
     let result = value
-        .replace(/\[[^\]]*\bcommand\b[^\]]*\]/gi, ' ')
+        .replace(/\\[^\\\\]*\bcommand\b[^\\\\]*\]/gi, ' ')
         .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
         .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
-        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
-        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,
+\s-]+/gi, ' ')
+        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,
+\s-]+/gi, ' ')
         .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
         .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
 
@@ -937,6 +709,7 @@ function removeCommandArtifacts(value) {
 
     return result;
 }
+*/
 
 function sanitizeForSpeech(text) {
     if (typeof text !== 'string') {
@@ -944,8 +717,8 @@ function sanitizeForSpeech(text) {
     }
 
     const withoutDirectives = text
-        .replace(/\[command:[^\]]*\]/gi, ' ')
-        .replace(/\{command:[^}]*\}/gi, ' ')
+        .replace(/\\[command:[^\\]*]/gi, ' ')
+        .replace(/\{command:[^}]*}/gi, ' ')
         .replace(/<command[^>]*>[^<]*<\/command>/gi, ' ')
         .replace(/\b(?:command|action)\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
         .replace(/\bcommands?\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
@@ -954,8 +727,8 @@ function sanitizeForSpeech(text) {
         .replace(/\bcommand\s*\([^)]*\)/gi, ' ');
 
     const withoutPollinations = withoutDirectives
-        .replace(/https?:\/\/\S*images?\.pollinations\.ai\S*/gi, '')
-        .replace(/\b\S*images?\.pollinations\.ai\S*\b/gi, '');
+        .replace(/https?:\/\/\S*images?.pollinations.ai\S*/gi, '')
+        .replace(/\b\S*images?.pollinations.ai\S*\b/gi, '');
 
     const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
     const withoutCommands = removeCommandArtifacts(withoutMarkdownTargets);
@@ -965,12 +738,14 @@ function sanitizeForSpeech(text) {
         .replace(/\bwww\.[^\s)]+/gi, ' ');
 
     const withoutSpacedUrls = withoutGenericUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*[\w\-./?%#&=]+/gi, ' ')
+        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*[\w\-. 
+/?%#&=]+/gi, ' ')
         .replace(/\bhttps?\b/gi, ' ')
         .replace(/\bwww\b/gi, ' ');
 
     const withoutSpelledUrls = withoutSpacedUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*(?:[:=]|colon)\s*\/\s*\/\s*[\w\-./?%#&=]+/gi, ' ')
+        .replace(/h\s*t\s*t\s*p\s*s?\s*(?:[:=]|colon)\s*\/\s*\/\s*[\w\-. 
+/?%#&=]+/gi, ' ')
         .replace(/\b(?:h\s*t\s*t\s*p\s*s?|h\s*t\s*t\s*p)\b/gi, ' ')
         .replace(/\bcolon\b/gi, ' ')
         .replace(/\bslash\b/gi, ' ');
@@ -1017,8 +792,8 @@ function sanitizeForSpeech(text) {
         .replace(/\s{2,}/g, ' ')
         .replace(/\s+([.,!?;:])/g, '$1')
         .replace(/\(\s*\)/g, '')
-        .replace(/\[\s*\]/g, '')
-        .replace(/\{\s*\}/g, '')
+        .replace(/\\[\s*\]/g, '')
+        .replace(/\{\s*}/g, '')
         .replace(/\b(?:https?|www)\b/gi, '')
         .replace(/\b[a-z0-9]+\s+dot\s+[a-z0-9]+\b/gi, '')
         .replace(/\b(?:dot\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\b/gi, '')
@@ -1038,7 +813,8 @@ function sanitizeImageUrl(rawUrl) {
 
     return rawUrl
         .trim()
-        .replace(/^["'<\[({]+/, '')
+        .replace(/^["'<\\\[({]+/,
+'')
         .replace(/["'>)\]}]+$/, '')
         .replace(/[,.;!]+$/, '');
 }
@@ -1068,7 +844,7 @@ function shouldRequestFallbackImage({ userInput = '', assistantMessage = '', fal
         return true;
     }
 
-    const keywordPattern = new RegExp(`\\b(?:${FALLBACK_IMAGE_KEYWORDS.join('|')})\\b`, 'i');
+    const keywordPattern = new RegExp(`\b(?:${FALLBACK_IMAGE_KEYWORDS.join('|')})\b`, 'i');
     if (keywordPattern.test(combined)) {
         return true;
     }
@@ -1079,8 +855,10 @@ function shouldRequestFallbackImage({ userInput = '', assistantMessage = '', fal
 
 function cleanFallbackPrompt(text) {
     return text
-        .replace(/^["'\s]+/, '')
-        .replace(/["'\s]+$/, '')
+        .replace(/^["'
+\s]+/, '')
+        .replace(/["'
+\s]+$/, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
 }
@@ -1092,7 +870,7 @@ function buildFallbackImagePrompt(userInput = '', assistantMessage = '') {
             continue;
         }
 
-        const explicitPromptMatch = source.match(/(?:image\s+prompt|prompt)\s*[:=]\s*"?([^"\n]+)"?/i);
+        const explicitPromptMatch = source.match(/(?:image\s+prompt|prompt)\s*[:=]\s*"?([^"]*)"?/i);
         if (explicitPromptMatch?.[1]) {
             const sanitized = cleanFallbackPrompt(explicitPromptMatch[1]);
             if (sanitized) {
@@ -1143,7 +921,8 @@ function buildPollinationsImageUrl(prompt, { model = currentImageModel } = {}) {
         height: '1024',
         nologo: 'true',
         enhance: 'true',
-        seed: Math.floor(Math.random() * 1_000_000_000).toString()
+        safe: 'false',
+        seed: Math.floor(Math.random() * 100000000).toString()
     });
 
     return `https://image.pollinations.ai/prompt/${encodeURIComponent(sanitized)}?${params.toString()}`;
@@ -1154,7 +933,7 @@ function extractImageUrl(text) {
         return '';
     }
 
-    const markdownMatch = text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
+    const markdownMatch = text.match(/!\\[[^\\]*].*\((https?:\/\/[^)\s]+)\)/i);
     if (markdownMatch && markdownMatch[1]) {
         return sanitizeImageUrl(markdownMatch[1]);
     }
@@ -1168,7 +947,7 @@ function extractImageUrl(text) {
 }
 
 function escapeRegExp(value) {
-    return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return value.replace(/[-/\\^$*+?.()|[\\]{}]/g, '\\$&');
 }
 
 function removeImageReferences(text, imageUrl) {
@@ -1188,10 +967,10 @@ function removeImageReferences(text, imageUrl) {
     let result = text;
     const escapedUrl = escapeRegExp(sanitizedUrl);
 
-    const markdownImageRegex = new RegExp(`!\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'gi');
+    const markdownImageRegex = new RegExp(`!\[[^\]]*\]\(${escapedUrl}\)`, 'gi');
     result = result.replace(markdownImageRegex, '');
 
-    const markdownLinkRegex = new RegExp(`\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'gi');
+    const markdownLinkRegex = new RegExp(`\[[^\]]*\]\(${escapedUrl}\)`, 'gi');
     result = result.replace(markdownLinkRegex, '');
 
     const rawUrlRegex = new RegExp(escapedUrl, 'gi');
@@ -1203,7 +982,7 @@ function removeImageReferences(text, imageUrl) {
         .replace(/\bart(?:work)?\s+(?:url|link)\s*:?/gi, '')
         .replace(/<\s*>/g, '')
         .replace(/\(\s*\)/g, '')
-        .replace(/\[\s*\]/g, '');
+        .replace(/\\[\s*\]/g, '');
 
     return result
         .replace(/\n{3,}/g, '\n\n')
@@ -1225,7 +1004,7 @@ function parseAiDirectives(responseText) {
     let workingText = responseText;
 
     const patterns = [
-        /\[command:\s*([^\]]+)\]/gi,
+        /\\[command:\s*([^\\]+)\]/gi,
         /\{command:\s*([^}]+)\}/gi,
         /<command[^>]*>\s*([^<]*)<\/command>/gi,
         /\bcommand\s*[:=]\s*([a-z0-9_\-]+)/gi,
@@ -1247,7 +1026,21 @@ function parseAiDirectives(responseText) {
         });
     }
 
-    const slashCommandRegex = /(?:^|\s)\/(open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\b/gi;
+    const slashCommandRegex = /(?:^|\s)\/(
+        open_image|
+        save_image|
+        copy_image|
+        mute_microphone|
+        unmute_microphone|
+        stop_speaking|
+        shutup|
+        set_model_flux|
+        set_model_turbo|
+        set_model_kontext|
+        clear_chat_history|
+        theme_light|
+        theme_dark
+    )\b/gi;
     workingText = workingText.replace(slashCommandRegex, (_match, commandValue) => {
         const normalized = normalizeCommandValue(commandValue);
         if (normalized) {
@@ -1256,7 +1049,7 @@ function parseAiDirectives(responseText) {
         return ' ';
     });
 
-    const directiveBlockRegex = /(?:^|\n)\s*(?:commands?|actions?)\s*:?\s*(?:\n|$)((?:\s*[-*•]?\s*[a-z0-9_\-]+\s*(?:\(\))?\s*(?:\n|$))+)/gi;
+    const directiveBlockRegex = /(?:^|\n)\s*(?:commands?|actions?)\s*:?\s*(?:\n|$)((\s*[-*•]?\s*[a-z0-9_\-]+\s*(?:\(\))?\s*(?:\n|$))+)/gi;
     workingText = workingText.replace(directiveBlockRegex, (_match, blockContent) => {
         const lines = blockContent
             .split(/\n+/)
