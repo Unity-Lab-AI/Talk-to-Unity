@@ -21,7 +21,7 @@
                 );
 
                 if (!hasCookie && !isFileProtocol) {
-                    const fallbackUrl = new URL('../index.html', window.location.href);
+                    const fallbackUrl = new URL('../', window.location.href);
                     window.location.replace(fallbackUrl.toString());
                 }
             } catch (error) {

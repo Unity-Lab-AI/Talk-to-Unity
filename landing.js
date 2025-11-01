@@ -135,8 +135,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.cookie = "checks-passed=true;path=/";
             // Redirect to the AI page relative to the current location so the
             // experience keeps working when the site is hosted from a
-            // subdirectory (such as GitHub Pages).
-            const launchUrl = new URL('./AI/index.html', window.location.href);
+            // subdirectory (such as GitHub Pages). We point at the directory
+            // itself so browsers don't expose the underlying index.html file
+            // in the address bar.
+            const launchUrl = new URL('./AI/', window.location.href);
             window.location.assign(launchUrl.toString());
         }
     });
