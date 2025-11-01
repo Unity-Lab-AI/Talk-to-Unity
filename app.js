@@ -1,4 +1,5 @@
 const background = document.getElementById('background');
+const backgroundImage = document.getElementById('background-image');
 const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
@@ -163,19 +164,31 @@ async function setMutedState(muted, { announce = false } = {}) {
     }
 }
 
-function applyTheme(theme, { announce = false } = {}) {
+function applyTheme(theme, { announce = false, force = false } = {}) {
     const normalizedTheme = theme === 'light' ? 'light' : 'dark';
     const body = document.body;
+    const root = document.documentElement;
 
     if (!body) {
         currentTheme = normalizedTheme;
+        if (root) {
+            root.dataset.theme = normalizedTheme;
+        }
         return;
     }
 
-    const wasThemeChanged = currentTheme !== normalizedTheme || body.dataset.theme !== normalizedTheme;
+    const previousTheme = currentTheme;
+    const wasThemeChanged =
+        force ||
+        previousTheme !== normalizedTheme ||
+        body.dataset.theme !== normalizedTheme ||
+        (root?.dataset.theme ?? previousTheme) !== normalizedTheme;
 
     currentTheme = normalizedTheme;
     body.dataset.theme = normalizedTheme;
+    if (root) {
+        root.dataset.theme = normalizedTheme;
+    }
 
     if (announce) {
         if (!wasThemeChanged) {
@@ -191,7 +204,15 @@ function setCircleState(circle, { speaking = false, listening = false, error = f
         return;
     }
 
-    circle.classList.toggle('is-speaking', speaking);
+    if (speaking) {
+        if (circle.classList.contains('is-speaking')) {
+            circle.classList.remove('is-speaking');
+            void circle.offsetWidth;
+        }
+        circle.classList.add('is-speaking');
+    } else {
+        circle.classList.remove('is-speaking');
+    }
     circle.classList.toggle('is-listening', listening);
     circle.classList.toggle('is-error', error);
 
@@ -658,17 +679,6 @@ function speak(text) {
 }
 
 
-function applyTheme(theme, { force = false } = {}) {
-    const normalizedTheme = theme === 'light' ? 'light' : 'dark';
-
-    if (!force && normalizedTheme === currentTheme) {
-        return;
-    }
-
-    currentTheme = normalizedTheme;
-    document.documentElement.dataset.theme = normalizedTheme;
-}
-
 function handleVoiceCommand(command) {
     const lowerCaseCommand = command.toLowerCase();
 
@@ -909,16 +919,15 @@ function getImageUrl() {
         return currentBackgroundUrl;
     }
 
-    if (!background) {
-        return '';
+    if (backgroundImage?.getAttribute('src')) {
+        return backgroundImage.getAttribute('src');
     }
-    const style = window.getComputedStyle(background);
-    const backgroundImage = style.getPropertyValue('background-image');
-    return backgroundImage.slice(5, -2);
+
+    return '';
 }
 
 function updateBackgroundImage(imageUrl) {
-    if (!background || !imageUrl) {
+    if (!background || !backgroundImage || !imageUrl) {
         return;
     }
 
@@ -926,9 +935,14 @@ function updateBackgroundImage(imageUrl) {
         return;
     }
 
+    const hadImage = background.classList.contains('has-image');
+
     pendingBackgroundUrl = imageUrl;
     background.dataset.state = 'loading';
-    background.classList.remove('has-image');
+    if (!hadImage) {
+        background.classList.remove('has-image');
+        backgroundImage.removeAttribute('src');
+    }
 
     const image = new Image();
     image.decoding = 'async';
@@ -941,7 +955,7 @@ function updateBackgroundImage(imageUrl) {
 
         currentBackgroundUrl = imageUrl;
         pendingBackgroundUrl = '';
-        background.style.backgroundImage = `url("${imageUrl}")`;
+        backgroundImage.src = imageUrl;
         background.dataset.state = 'loaded';
         background.classList.add('has-image');
     };
@@ -950,8 +964,13 @@ function updateBackgroundImage(imageUrl) {
         if (pendingBackgroundUrl === imageUrl) {
             pendingBackgroundUrl = '';
         }
-        background.dataset.state = 'error';
-        background.classList.remove('has-image');
+        if (!hadImage) {
+            background.dataset.state = 'error';
+            background.classList.remove('has-image');
+            backgroundImage.removeAttribute('src');
+        } else {
+            background.dataset.state = 'loaded';
+        }
         console.error('Failed to load background image:', error);
     };
 

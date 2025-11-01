@@ -12,8 +12,10 @@
     <!-- endbuild js -->
 </head>
 <body>
-    <div id="background" aria-hidden="true"></div>
     <div class="app-shell">
+        <figure id="background" class="image-stage" aria-hidden="true">
+            <img id="background-image" alt="" loading="lazy" decoding="async" />
+        </figure>
         <header class="status-banner" role="status" aria-live="polite">
             <button id="mute-indicator" class="mute-indicator" data-state="muted" type="button">
                 <span class="indicator-text">Tap or click anywhere to unmute</span>
