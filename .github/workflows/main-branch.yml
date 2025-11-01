@@ -177,17 +177,3 @@ jobs:
         if: needs.tests.outputs.status == 'failed'
         run: exit 1
 
-  deploy:
-    name: Deploy to Pages
-    runs-on: ubuntu-latest
-    needs: build_artifacts
-    if: needs.build_artifacts.outputs.status == 'success'
-    environment:
-      name: github-pages
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-    outputs:
-      page_url: ${{ steps.deployment.outputs.page_url }}
