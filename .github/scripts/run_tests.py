@@ -44,7 +44,7 @@ def main() -> int:
     else:
         print("All tests passed.")
 
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -1,15 +1,43 @@
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+import pytest
+
+try:
+    from playwright.sync_api import sync_playwright, Error
+except ImportError:  # pragma: no cover - Playwright may be absent or expose Error elsewhere
+    try:
+        from playwright.sync_api import sync_playwright  # type: ignore[no-redef]
+    except ImportError:
+        sync_playwright = None  # type: ignore[assignment]
+    try:
+        from playwright._impl._api_types import Error  # type: ignore[import-not-found]
+    except Exception:  # pragma: no cover - fallback when Error isn't exposed
+        Error = Exception  # type: ignore[assignment]
+
+
+if sync_playwright is None:  # type: ignore[name-defined]
+    pytest.skip(
+        "Playwright is not installed in this environment.",
+        allow_module_level=True,
+    )
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LANDING_URL = REPO_ROOT.joinpath("index.html").resolve().as_uri()
 
+def launch_chromium(playwright):
+    try:
+        return playwright.chromium.launch()
+    except Error as exc:
+        message = str(exc)
+        if "Executable doesn't exist" in message:
+            pytest.skip('Playwright Chromium browser is not installed in this environment.')
+        raise
+
 
 def test_landing_page_structure():
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
+        browser = launch_chromium(playwright)
         context = browser.new_context(ignore_https_errors=True)
         page = context.new_page()
         page.goto(LANDING_URL, wait_until="load")

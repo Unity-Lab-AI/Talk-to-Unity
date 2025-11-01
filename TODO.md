@@ -9,7 +9,7 @@
 - [ ] Fix JavaScript errors on the `/ai` page:
     - [ ] `Unexpected token 'export'`
     - [ ] `Invalid regular expression`
-- [ ] Review and address the GitHub workflows to ensure they build and deploy the page properly.
+- [x] Review and address the GitHub workflows to ensure they build and deploy the page properly.
 
 ## Current State
 

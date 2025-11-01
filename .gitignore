@@ -1,0 +1,12 @@
+# Build artifacts
+/dist/
+/build-results.json
+/test-results.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Playwright artifacts
+/playwright-report/
+/.pytest_cache/

@@ -38,6 +38,7 @@ def main() -> int:
     dist.mkdir(parents=True, exist_ok=True)
 
     result = {"status": "success", "copied": []}
+    exit_code = 0
     try:
         result["copied"] = copy_static_files(dist)
         if not result["copied"]:
@@ -50,8 +51,9 @@ def main() -> int:
         result["status"] = "failure"
         result["message"] = str(exc)
         print(f"::error::Static site build failed: {exc}")
+        exit_code = 1
     Path("build-results.json").write_text(json.dumps(result))
-    return 0
+    return exit_code
 
 if __name__ == "__main__":
     raise SystemExit(main())

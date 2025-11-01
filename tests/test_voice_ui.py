@@ -1,7 +1,25 @@
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import sync_playwright
+
+try:
+    from playwright.sync_api import sync_playwright, Error
+except ImportError:  # pragma: no cover - Playwright may be absent or expose Error elsewhere
+    try:
+        from playwright.sync_api import sync_playwright  # type: ignore[no-redef]
+    except ImportError:
+        sync_playwright = None  # type: ignore[assignment]
+    try:
+        from playwright._impl._api_types import Error  # type: ignore[import-not-found]
+    except Exception:  # pragma: no cover - fallback when Error isn't exposed
+        Error = Exception  # type: ignore[assignment]
+
+
+if sync_playwright is None:  # type: ignore[name-defined]
+    pytest.skip(
+        "Playwright is not installed in this environment.",
+        allow_module_level=True,
+    )
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -155,10 +173,20 @@ STUB_SCRIPT = """
 """
 
 
+def launch_chromium(playwright):
+    try:
+        return playwright.chromium.launch()
+    except Error as exc:
+        message = str(exc)
+        if "Executable doesn't exist" in message:
+            pytest.skip('Playwright Chromium browser is not installed in this environment.')
+        raise
+
+
 @pytest.fixture
 def loaded_page():
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
+        browser = launch_chromium(playwright)
         context = browser.new_context(ignore_https_errors=True)
         page = context.new_page()
         page.add_init_script(STUB_SCRIPT)
@@ -186,6 +214,13 @@ def test_unmute_flow_triggers_recognition_and_updates_indicator(loaded_page):
         """() => document.querySelector('[data-role="user"]').classList.contains('is-listening')"""
     )
     assert user_is_listening is True
+
+
+def test_unmute_requests_microphone_permission_once(loaded_page):
+    page = loaded_page
+    page.evaluate("window.__testState.getUserMediaCalls = 0")
+    page.dispatch_event("body", "click")
+    page.wait_for_function("() => window.__testState.getUserMediaCalls === 1")
 
 
 def test_voice_prompts_announce_theme_changes(loaded_page):
