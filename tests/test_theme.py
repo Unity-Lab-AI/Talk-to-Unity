@@ -35,9 +35,9 @@ def test_voice_stage_has_glass_shell():
     assert "border: 1px solid" in block
 
 
-def test_root_style_defines_gradient_theme():
+def test_root_style_defines_solid_theme():
     css = strip_css_comments((ROOT / "style.css").read_text())
-    assert "--background-gradient" in css
-    assert "background: var(--background-gradient" in css
+    assert "--background-color" in css
+    assert "background: var(--background-color" in css
     assert "--surface-color" in css
     assert "--surface-highlight" in css

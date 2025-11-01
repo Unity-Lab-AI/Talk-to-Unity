@@ -2,9 +2,7 @@
 :root[data-theme='dark'] {
     color-scheme: dark;
     --background-color: #020617;
-    --background-gradient: radial-gradient(120% 120% at 20% 0%, rgba(14, 165, 233, 0.25) 0%, rgba(8, 145, 178, 0.18) 24%, transparent 55%),
-        radial-gradient(160% 140% at 80% 20%, rgba(99, 102, 241, 0.28) 0%, rgba(56, 189, 248, 0.18) 30%, transparent 60%),
-        linear-gradient(180deg, #020617 0%, #01030f 100%);
+    --background-gradient: none;
     --text-color: #f5f7fa;
     --muted-text: rgba(226, 232, 240, 0.74);
     --accent-primary: #38bdf8;
@@ -22,9 +20,7 @@
 body[data-theme='light'] {
     color-scheme: light;
     --background-color: #f5f7fa;
-    --background-gradient: radial-gradient(140% 110% at 20% 0%, rgba(56, 189, 248, 0.28) 0%, rgba(14, 165, 233, 0.16) 36%, transparent 58%),
-        radial-gradient(120% 120% at 85% 15%, rgba(99, 102, 241, 0.22) 0%, rgba(56, 189, 248, 0.12) 32%, transparent 62%),
-        linear-gradient(180deg, #f5f7fa 0%, #edf2f7 100%);
+    --background-gradient: none;
     --text-color: #0b1324;
     --muted-text: rgba(15, 23, 42, 0.68);
     --accent-primary: #0f4c81;
@@ -54,24 +50,12 @@ body {
     min-height: 100vh;
     font-family: 'Space Grotesk', 'Roboto', 'Segoe UI', sans-serif;
     color: var(--text-color);
-    background: var(--background-gradient, var(--background-color));
+    background: var(--background-color);
     display: flex;
     flex-direction: column;
     padding: clamp(24px, 5vw, 48px) clamp(16px, 6vw, 64px);
     position: relative;
     overflow-x: hidden;
-}
-
-body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(120% 120% at 50% -10%, rgba(56, 189, 248, 0.2) 0%, transparent 60%),
-        radial-gradient(120% 120% at 90% 10%, rgba(99, 102, 241, 0.24) 0%, transparent 62%),
-        radial-gradient(120% 120% at 10% 80%, rgba(15, 118, 110, 0.22) 0%, transparent 65%);
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.9;
 }
 
 body > * {
@@ -134,31 +118,10 @@ body[data-app-state='experience'] #landing {
     overflow: hidden;
 }
 
-.surface-card::before {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    border-radius: inherit;
-    background: linear-gradient(120deg, rgba(255, 255, 255, 0.06), transparent 55%);
-    pointer-events: none;
-    opacity: 0.65;
-    z-index: -1;
-}
-
 .accent-card {
     overflow: hidden;
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.45) 0%, rgba(14, 165, 233, 0.18) 32%, rgba(99, 102, 241, 0.28) 100%),
-        var(--surface-color);
+    background: var(--surface-color);
     box-shadow: 0 36px 90px rgba(14, 116, 144, 0.6);
-}
-
-.accent-card::after {
-    content: '';
-    position: absolute;
-    inset: -45% 45% 40% -35%;
-    background: radial-gradient(circle at 0% 50%, rgba(56, 189, 248, 0.55), transparent 58%);
-    opacity: 0.6;
-    pointer-events: none;
 }
 
 .landing-grid {
@@ -245,7 +208,7 @@ body[data-theme='light'] .landing-lede {
 .landing-link:hover,
 .landing-link:focus-visible {
     color: var(--accent-primary-contrast);
-    background: linear-gradient(120deg, rgba(56, 189, 248, 0.9), rgba(99, 102, 241, 0.85));
+    background: var(--accent-primary);
     outline: none;
 }
 
@@ -386,18 +349,18 @@ body[data-theme='light'] .dependency-summary p {
 }
 
 .dependency-light[data-state='pending'] {
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.85), rgba(99, 102, 241, 0.85));
+    background: var(--accent-primary);
     opacity: 0.8;
 }
 
 .dependency-light[data-state='fail'] {
-    background: linear-gradient(135deg, rgba(96, 165, 250, 0.95), rgba(129, 140, 248, 0.95));
+    background: var(--accent-secondary);
     opacity: 1;
-    box-shadow: 0 0 0 8px rgba(96, 165, 250, 0.18);
+    box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.18);
 }
 
 .dependency-light[data-state='pass'] {
-    background: linear-gradient(135deg, rgba(52, 211, 153, 0.95), rgba(16, 185, 129, 0.9));
+    background: var(--accent-success);
     opacity: 1;
     box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.18);
 }
@@ -507,7 +470,7 @@ button {
 }
 
 button.primary {
-    background: linear-gradient(120deg, rgba(56, 189, 248, 0.95) 0%, rgba(45, 212, 191, 0.8) 36%, rgba(99, 102, 241, 0.88) 100%);
+    background: var(--accent-primary);
     color: #041014;
     font-weight: 700;
     box-shadow: 0 28px 60px rgba(14, 165, 233, 0.48);
@@ -515,7 +478,7 @@ button.primary {
 
 button.primary:not(:disabled):hover,
 button.primary:not(:disabled):focus-visible {
-    background: linear-gradient(120deg, rgba(56, 189, 248, 1), rgba(14, 165, 233, 0.95) 45%, rgba(129, 140, 248, 0.95) 100%);
+    background: var(--accent-secondary);
     color: #020617;
     outline: none;
     transform: translateY(-2px);
