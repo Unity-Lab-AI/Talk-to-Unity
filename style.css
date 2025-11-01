@@ -5,6 +5,7 @@
     --text-color: #f3f3f3;
     --muted-text: rgba(228, 228, 228, 0.78);
     --surface-bg: rgba(18, 18, 18, 0.9);
+    --surface-highlight: rgba(26, 6, 6, 0.88);
     --surface-border: rgba(255, 62, 62, 0.38);
     --accent-red: #ff3e3e;
     --accent-red-soft: rgba(255, 62, 62, 0.6);
@@ -47,7 +48,7 @@ body {
     justify-content: flex-start;
     width: 100%;
     position: relative;
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    background: linear-gradient(150deg, #040404 0%, #120202 45%, #1a0505 100%);
     padding: clamp(24px, 6vh, 48px) clamp(16px, 5vw, 56px);
     gap: clamp(24px, 6vh, 56px);
 }
@@ -57,8 +58,9 @@ body::after {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(circle at 15% 20%, rgba(255, 62, 62, 0.18), transparent 55%),
-        radial-gradient(circle at 85% 10%, rgba(255, 120, 120, 0.12), transparent 60%);
+    background: radial-gradient(circle at 20% 15%, rgba(255, 36, 36, 0.28), transparent 58%),
+        radial-gradient(circle at 80% 12%, rgba(128, 0, 0, 0.35), transparent 62%),
+        radial-gradient(circle at 50% 85%, rgba(255, 80, 80, 0.18), transparent 65%);
     z-index: 0;
     opacity: 0.9;
 }
@@ -426,6 +428,19 @@ button.primary[data-state='warn'] {
     background: linear-gradient(135deg, rgba(255, 174, 0, 0.95), rgba(255, 94, 0, 0.88));
     color: #111318;
     box-shadow: 0 14px 35px rgba(255, 174, 0, 0.35);
+}
+
+button.primary[data-state='pending'] {
+    background: linear-gradient(135deg, rgba(90, 16, 16, 0.72), rgba(150, 28, 28, 0.75));
+    color: rgba(250, 232, 232, 0.9);
+    box-shadow: 0 10px 28px rgba(255, 62, 62, 0.25);
+}
+
+button.primary[data-state='ready'] {
+    background: linear-gradient(135deg, #ff2727, #ff6161);
+    color: #140404;
+    box-shadow: 0 22px 56px rgba(255, 62, 62, 0.55);
+    border-color: rgba(255, 120, 120, 0.85);
 }
 
 button.primary:disabled {

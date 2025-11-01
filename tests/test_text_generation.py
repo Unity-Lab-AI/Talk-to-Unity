@@ -26,7 +26,7 @@ def test_public_page_contains_call_to_action():
             break
 
     if not any("Tap or click anywhere to unmute" in source for source in html_sources):
-        local_path = Path("AI/index.html")
+        local_path = Path("index.html")
         if local_path.exists():
             html_sources.append(local_path.read_text(encoding="utf-8"))
 

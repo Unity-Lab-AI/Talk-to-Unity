@@ -4,13 +4,6 @@ const heroStage = document.getElementById('hero-stage');
 const heroImage = document.getElementById('hero-image');
 const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
-const normalizedPath = (() => {
-    const pathname = window.location.pathname || '';
-    const withoutIndex = pathname.replace(/index\.html$/i, '');
-    const trimmed = withoutIndex.replace(/\/+$/, '');
-    return trimmed || '/';
-})();
-const isExperienceRoute = /\/(?:AI)$/i.test(normalizedPath);
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
 const dependencyLight = document.querySelector('[data-role="dependency-light"]');
@@ -19,17 +12,6 @@ const dependencyList = document.getElementById('dependency-list');
 const launchButton = document.getElementById('launch-app');
 const recheckButton = document.getElementById('recheck-dependencies');
 const statusMessage = document.getElementById('status-message');
-const redirectToLandingWithStatus = () => {
-    const landingUrl = new URL(window.location.href);
-    landingUrl.search = '';
-    landingUrl.hash = '';
-    landingUrl.pathname = landingUrl.pathname.replace(/AI\/?(?:index\.html)?$/i, '');
-    if (!landingUrl.pathname.endsWith('/')) {
-        landingUrl.pathname = `${landingUrl.pathname}/`;
-    }
-    landingUrl.searchParams.set('missing', '1');
-    window.location.replace(landingUrl.toString());
-};
 
 if (heroImage) {
     heroImage.setAttribute('crossorigin', 'anonymous');
@@ -134,7 +116,7 @@ function updateLaunchButtonState({ allMet, missing }) {
 
     if (missing.length > 0) {
         const summary = formatDependencyList(missing);
-        launchButton.title = `Launch anyway with limited support: ${summary}`;
+        launchButton.title = `Talk to Unity with limited support: ${summary}`;
     } else {
         launchButton.removeAttribute('title');
     }
@@ -159,6 +141,35 @@ function ensureCompatibilityBanner() {
 
     compatibilityBanner = banner;
     return compatibilityBanner;
+}
+
+function showRecheckInProgress() {
+    allowLaunchOverride = false;
+    setLaunchButtonState(false);
+    if (launchButton) {
+        launchButton.dataset.state = 'pending';
+    }
+
+    if (dependencyLight) {
+        dependencyLight.dataset.state = 'pending';
+        dependencyLight.setAttribute('aria-label', 'Re-checking requirements');
+    }
+
+    if (dependencySummary) {
+        dependencySummary.textContent = 'Re-checking your setup…';
+    }
+
+    if (dependencyList) {
+        dependencyList.querySelectorAll('.dependency-item').forEach((item) => {
+            item.dataset.state = 'pending';
+            const statusElement = item.querySelector('.dependency-status');
+            if (statusElement) {
+                statusElement.textContent = 'Checking…';
+            }
+        });
+    }
+
+    setStatusMessage('Running the readiness scan again…', 'info');
 }
 
 if (heroStage && !heroStage.dataset.state) {
@@ -200,12 +211,7 @@ function resolveAssetPath(relativePath) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const evaluation = evaluateDependencies({ announce: isExperienceRoute });
-
-    if (isExperienceRoute) {
-        startApplication();
-        return;
-    }
+    evaluateDependencies();
 
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
@@ -215,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (statusMessage) {
                 const advisory =
-                    'Some requirements are still missing. Select “Launch anyway” to continue with limited functionality.';
+                    'Some requirements are still missing. Select “Talk to Unity (limited mode)” to continue with reduced functionality.';
                 statusMessage.textContent = statusMessage.textContent
                     ? `${statusMessage.textContent} ${advisory}`
                     : advisory;
@@ -223,11 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const targetUrl = new URL('./AI/', window.location.href);
-        window.location.assign(targetUrl.toString());
+        startApplication();
     });
 
     recheckButton?.addEventListener('click', () => {
+        showRecheckInProgress();
         evaluateDependencies({ announce: true });
     });
 });
@@ -244,7 +250,7 @@ function setLaunchButtonState(allMet) {
     }
 
     if (!defaultLaunchLabel) {
-        defaultLaunchLabel = launchButton.textContent?.trim() ?? 'Launch Unity Voice Lab';
+        defaultLaunchLabel = launchButton.textContent?.trim() ?? 'Talk to Unity';
     }
 
     launchButton.disabled = false;
@@ -258,7 +264,7 @@ function setLaunchButtonState(allMet) {
     }
 
     launchButton.dataset.launchOverride = allowLaunchOverride ? 'ready' : 'required';
-    launchButton.textContent = allowLaunchOverride ? 'Launch anyway' : defaultLaunchLabel;
+    launchButton.textContent = allowLaunchOverride ? 'Talk to Unity (limited mode)' : defaultLaunchLabel;
 }
 
 function evaluateDependencies({ announce = false } = {}) {
@@ -288,12 +294,12 @@ function evaluateDependencies({ announce = false } = {}) {
 
     if (announce) {
         if (allMet) {
-            setStatusMessage('All systems look good. Launching Unity Voice Lab…', 'success');
+            setStatusMessage('All systems look good. Launching Talk to Unity…', 'success');
         } else {
             const summary = formatDependencyList(missing);
             const message = summary
-                ? `Launching in compatibility mode. Some features may be limited: ${summary}.`
-                : 'Launching in compatibility mode. Some browser features may be limited.';
+                ? `Starting Talk to Unity in compatibility mode. Some features may be limited: ${summary}.`
+                : 'Starting Talk to Unity in compatibility mode. Some browser features may be limited.';
             setStatusMessage(message, 'warning');
             speak(message);
         }
@@ -335,13 +341,12 @@ function updateDependencyUI(results, allMet, { announce = false, missing = [] } 
 
     if (dependencySummary) {
         if (missing.length === 0) {
-            dependencySummary.textContent =
-                'All the lights are green! Press "Launch Unity Voice Lab" to start chatting.';
+            dependencySummary.textContent = 'All the lights are green! Press "Talk to Unity" to start chatting.';
         } else {
             const summary = formatDependencyList(missing);
             dependencySummary.textContent = summary
-                ? `We spotted a few red lights (${summary}). Unity will still launch, but those features may be limited until they turn green.`
-                : 'We spotted a few red lights. Unity will still launch, but some features may be limited.';
+                ? `We spotted a few red lights (${summary}). Talk to Unity will still launch, but those features may be limited until they turn green.`
+                : 'We spotted a few red lights. Talk to Unity will still launch, but some features may be limited.';
         }
     }
 
