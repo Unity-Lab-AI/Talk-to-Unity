@@ -424,7 +424,12 @@ function isLikelyUrlSegment(segment) {
 
     const normalized = cleaned.toLowerCase();
 
-    if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('www.')) {
+    if (
+        normalized.startsWith('http://') ||
+        normalized.startsWith('https://') ||
+        normalized.startsWith('www.') ||
+        normalized.includes('://')
+    ) {
         return true;
     }
 
@@ -433,6 +438,16 @@ function isLikelyUrlSegment(segment) {
     }
 
     return false;
+}
+
+function removeMarkdownLinkTargets(value) {
+    return value
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, altText, url) => {
+            return isLikelyUrlSegment(url) ? altText : _match;
+        })
+        .replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_match, linkText, url) => {
+            return isLikelyUrlSegment(url) ? linkText : _match;
+        });
 }
 
 function sanitizeForSpeech(text) {
@@ -444,7 +459,13 @@ function sanitizeForSpeech(text) {
         .replace(/https?:\/\/\S*image\.pollinations\.ai\S*/gi, '')
         .replace(/\b\S*image\.pollinations\.ai\S*\b/gi, '');
 
-    const parts = withoutPollinations.split(/(\s+)/);
+    const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
+
+    const withoutGenericUrls = withoutMarkdownTargets
+        .replace(/https?:\/\/\S+/gi, ' ')
+        .replace(/\bwww\.[^\s)]+/gi, ' ');
+
+    const parts = withoutGenericUrls.split(/(\s+)/);
     const sanitizedParts = parts.map((part) => (isLikelyUrlSegment(part) ? '' : part));
     const sanitized = sanitizedParts
         .join('')
@@ -801,13 +822,17 @@ function updateBackgroundImage(imageUrl) {
         return;
     }
 
-    if (imageUrl === currentBackgroundUrl) {
+    if (imageUrl === currentBackgroundUrl && background.dataset.state === 'loaded') {
         return;
     }
 
     pendingBackgroundUrl = imageUrl;
+    background.dataset.state = 'loading';
+    background.classList.remove('has-image');
 
     const image = new Image();
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
 
     image.onload = () => {
         if (pendingBackgroundUrl !== imageUrl) {
@@ -817,12 +842,16 @@ function updateBackgroundImage(imageUrl) {
         currentBackgroundUrl = imageUrl;
         pendingBackgroundUrl = '';
         background.style.backgroundImage = `url("${imageUrl}")`;
+        background.dataset.state = 'loaded';
+        background.classList.add('has-image');
     };
 
     image.onerror = (error) => {
         if (pendingBackgroundUrl === imageUrl) {
             pendingBackgroundUrl = '';
         }
+        background.dataset.state = 'error';
+        background.classList.remove('has-image');
         console.error('Failed to load background image:', error);
     };
 

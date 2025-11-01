@@ -63,9 +63,27 @@ html {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-
+    opacity: 0;
+    transition: opacity 0.6s ease;
     z-index: 1;
     pointer-events: none;
+}
+
+#background.has-image {
+    opacity: 1;
+}
+
+#background::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55));
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+#background.has-image::after {
+    opacity: 1;
 }
 
 .layout {
