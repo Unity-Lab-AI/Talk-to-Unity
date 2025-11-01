@@ -37,6 +37,8 @@ const dependencyChecks = [
     }
 ];
 
+let landingInitialized = false;
+
 function formatDependencyList(items) {
     const labels = items
         .map((item) => item.friendlyName ?? item.label ?? item.id)
@@ -125,30 +127,45 @@ function showRecheckInProgress() {
     setStatusMessage('Running the readiness scan again…', 'info');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function handleLaunchButtonClick() {
+    const result = evaluateDependencies({ announce: true });
+    if (!result) {
+        return;
+    }
+
+    const { allMet, missing, results } = result;
+    const mode = allMet ? 'standard' : 'compatibility';
+
+    window.dispatchEvent(
+        new CustomEvent('talk-to-unity:launch', {
+            detail: { allMet, missing, results, mode }
+        })
+    );
+}
+
+function handleRecheckClick() {
+    showRecheckInProgress();
+    evaluateDependencies({ announce: true });
+}
+
+function bootstrapLandingExperience() {
+    if (landingInitialized) {
+        return;
+    }
+
+    landingInitialized = true;
+
     evaluateDependencies();
 
-    launchButton?.addEventListener('click', () => {
-        const result = evaluateDependencies({ announce: true });
-        if (!result) {
-            return;
-        }
+    launchButton?.addEventListener('click', handleLaunchButtonClick);
+    recheckButton?.addEventListener('click', handleRecheckClick);
+}
 
-        const { allMet, missing, results } = result;
-        const mode = allMet ? 'standard' : 'compatibility';
+document.addEventListener('DOMContentLoaded', bootstrapLandingExperience);
 
-        window.dispatchEvent(
-            new CustomEvent('talk-to-unity:launch', {
-                detail: { allMet, missing, results, mode }
-            })
-        );
-    });
-
-    recheckButton?.addEventListener('click', () => {
-        showRecheckInProgress();
-        evaluateDependencies({ announce: true });
-    });
-});
+if (document.readyState !== 'loading') {
+    bootstrapLandingExperience();
+}
 
 function ensureTrailingSlash(value) {
     if (typeof value !== 'string' || !value) {
@@ -314,4 +331,21 @@ function updateDependencyUI(results, allMet, { announce = false, missing = [] } 
     if (!announce && !allMet) {
         setStatusMessage('');
     }
+}
+
+if (typeof window !== 'undefined') {
+    Object.defineProperty(window, '__unityLandingTestHooks', {
+        value: {
+            initialize: () => bootstrapLandingExperience(),
+            evaluateDependencies: (options) => evaluateDependencies(options),
+            markAllDependenciesReady: () => {
+                const readyResults = dependencyChecks.map((descriptor) => ({ ...descriptor, met: true }));
+                updateDependencyUI(readyResults, true, { announce: false, missing: [] });
+                updateLaunchButtonState({ allMet: true, missing: [] });
+                setLaunchButtonState(true);
+            }
+        },
+        configurable: true,
+        enumerable: false
+    });
 }

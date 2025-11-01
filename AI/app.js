@@ -1649,6 +1649,9 @@
         }
 
         let aiText = '';
+        let finalAssistantMessage = '';
+        let selectedImageUrl = '';
+        let executedCommands = [];
 
         try {
             const messages = [{ role: 'system', content: systemPrompt }, ...chatHistory];
@@ -1688,6 +1691,7 @@
             }
 
             const { cleanedText, commands } = parseAiDirectives(aiText);
+            executedCommands = commands;
 
             for (const command of commands) {
                 await executeAiCommand(command);
@@ -1709,13 +1713,13 @@
                 fallbackImageUrl = buildPollinationsImageUrl(fallbackPrompt, { model: currentImageModel });
             }
 
-            const selectedImageUrl = imageUrlFromResponse || fallbackImageUrl;
+            selectedImageUrl = imageUrlFromResponse || fallbackImageUrl;
 
             const assistantMessageWithoutImage = selectedImageUrl
                 ? removeImageReferences(assistantMessage, selectedImageUrl)
                 : assistantMessage;
 
-            const finalAssistantMessage = assistantMessageWithoutImage.replace(/\n{3,}/g, '\n\n').trim();
+            finalAssistantMessage = assistantMessageWithoutImage.replace(/\n{3,}/g, '\n\n').trim();
             const chatAssistantMessage = finalAssistantMessage || '[image]';
 
             chatHistory.push({ role: 'assistant', content: chatAssistantMessage });
@@ -1734,7 +1738,12 @@
                     speak(spokenText);
                 }
             }
-
+            return {
+                text: finalAssistantMessage,
+                rawText: aiText,
+                imageUrl: selectedImageUrl,
+                commands: executedCommands
+            };
         } catch (error) {
             console.error('Error getting text from Pollinations AI:', error);
             setCircleState(aiCircle, {
@@ -1748,6 +1757,13 @@
                     label: 'Unity is idle'
                 });
             }, 2400);
+            return {
+                text: finalAssistantMessage,
+                rawText: aiText,
+                imageUrl: selectedImageUrl,
+                commands: executedCommands,
+                error
+            };
         }
     }
 
@@ -1761,6 +1777,35 @@
         }
 
         return '';
+    }
+
+    function getChatHistorySnapshot() {
+        return chatHistory.map((entry) => ({ ...entry }));
+    }
+
+    function sendUserInputForTesting(input) {
+        if (typeof input !== 'string') {
+            return Promise.resolve({
+                text: '',
+                rawText: '',
+                imageUrl: '',
+                commands: [],
+                error: new Error('Input must be a string')
+            });
+        }
+
+        const trimmed = input.trim();
+        if (!trimmed) {
+            return Promise.resolve({
+                text: '',
+                rawText: '',
+                imageUrl: '',
+                commands: [],
+                error: new Error('Input cannot be empty')
+            });
+        }
+
+        return getAIResponse(trimmed);
     }
 
     function updateHeroImage(imageUrl) {
@@ -1827,6 +1872,31 @@
         });
     }
 
+    function setHeroImageForTesting(imageUrl) {
+        if (!heroStage || !heroImage) {
+            return false;
+        }
+
+        if (!imageUrl) {
+            heroStage.classList.remove('has-image');
+            heroStage.dataset.state = 'empty';
+            heroStage.setAttribute('aria-hidden', 'true');
+            heroImage.removeAttribute('src');
+            currentHeroUrl = '';
+            pendingHeroUrl = '';
+            return true;
+        }
+
+        currentHeroUrl = imageUrl;
+        pendingHeroUrl = '';
+        heroStage.classList.add('is-visible');
+        heroStage.classList.add('has-image');
+        heroStage.dataset.state = 'loaded';
+        heroStage.setAttribute('aria-hidden', 'false');
+        heroImage.src = imageUrl;
+        return true;
+    }
+
     async function copyImageToClipboard() {
         const imageUrl = getImageUrl();
         if (!imageUrl) {
@@ -1880,11 +1950,26 @@
     }
 
     if (typeof window !== 'undefined') {
+        const testHooks = {
+            getChatHistory: () => getChatHistorySnapshot(),
+            sendUserInput: (input) => sendUserInputForTesting(input),
+            isAppReady: () => appShellReady,
+            getCurrentHeroImage: () => currentHeroUrl,
+            setHeroImage: (imageUrl) => setHeroImageForTesting(imageUrl)
+        };
+
         Object.assign(window, {
             applyTheme,
             setMutedState,
             startApplication,
             attemptUnmute
+        });
+
+        Object.defineProperty(window, '__unityTestHooks', {
+            value: testHooks,
+            writable: false,
+            enumerable: false,
+            configurable: true
         });
     }
 })();
