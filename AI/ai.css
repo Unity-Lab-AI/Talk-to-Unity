@@ -1,61 +1,95 @@
 body[data-app-state='experience'] {
-    background: radial-gradient(circle at 20% 20%, rgba(10, 189, 198, 0.12), transparent 55%),
-        radial-gradient(circle at 80% 15%, rgba(31, 111, 235, 0.1), transparent 65%),
-        linear-gradient(160deg, #020203, #05080d 55%, #090d13);
+    background: #000;
+    color: #f2f4f8;
+}
+
+body[data-app-state='experience']::after {
+    background: none;
 }
 
 body[data-app-state='experience'] .app-shell {
-    background: rgba(6, 8, 12, 0.78);
-    border: 1px solid rgba(10, 189, 198, 0.25);
-    box-shadow: 0 24px 80px rgba(8, 20, 30, 0.65);
-}
-
-body[data-app-state='experience'] .image-stage {
-    border-color: rgba(31, 111, 235, 0.25);
-    background: linear-gradient(135deg, rgba(8, 28, 38, 0.75), rgba(6, 18, 28, 0.95));
-}
-
-body[data-app-state='experience'] .voice-stage {
-    background: rgba(4, 10, 16, 0.55);
-    border-radius: clamp(28px, 8vw, 48px);
-    padding: clamp(24px, 6vw, 56px);
-    border: 1px solid rgba(10, 189, 198, 0.22);
-    box-shadow: inset 0 1px 0 rgba(31, 111, 235, 0.18);
-}
-
-body[data-app-state='experience'] .voice-circle {
-    background: linear-gradient(135deg, rgba(6, 18, 26, 0.85), rgba(4, 10, 16, 0.95));
-}
-
-body[data-app-state='experience'] .voice-circle.ai .pulse-ring {
-    border-color: rgba(10, 189, 198, 0.8);
-}
-
-body[data-app-state='experience'] .voice-circle.user .pulse-ring {
-    border-color: rgba(63, 208, 173, 0.7);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    width: min(960px, 100%);
+    padding-inline: clamp(16px, 4vw, 48px);
 }
 
 body[data-app-state='experience'] .status-banner {
-    background: rgba(6, 10, 16, 0.85);
-    border: 1px solid rgba(31, 111, 235, 0.24);
-    box-shadow: 0 18px 54px rgba(6, 18, 30, 0.45);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding-top: clamp(16px, 4vh, 32px);
 }
 
 body[data-app-state='experience'] .mute-indicator {
-    background: rgba(6, 10, 16, 0.88);
-    border-color: rgba(10, 189, 198, 0.32);
+    background: transparent;
+    border: 1.5px solid rgba(255, 255, 255, 0.24);
+    color: inherit;
+    border-radius: 999px;
+    padding: 12px 28px;
+    box-shadow: none;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 body[data-app-state='experience'] .mute-indicator[data-state='listening'] {
-    border-color: rgba(63, 208, 173, 0.65);
-    color: rgba(210, 236, 255, 0.92);
+    border-color: rgba(0, 204, 255, 0.5);
+    color: #e6fbff;
+}
+
+body[data-app-state='experience'] .mute-indicator[data-state='compat'] {
+    border-color: rgba(255, 153, 0, 0.5);
+    color: #ffe6c2;
 }
 
 body[data-app-state='experience'] .mute-indicator[data-state='muted'] {
-    color: rgba(150, 168, 185, 0.86);
+    color: rgba(220, 228, 235, 0.82);
+}
+
+body[data-app-state='experience'] .image-stage {
+    border: none;
+    background: #050505;
+    box-shadow: none;
+    width: min(820px, 100%);
+}
+
+body[data-app-state='experience'] #hero-stage::before {
+    display: none;
+}
+
+body[data-app-state='experience'] #hero-stage img {
+    max-width: 100%;
+}
+
+body[data-app-state='experience'] .voice-stage {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    gap: clamp(32px, 18vw, 160px);
+}
+
+body[data-app-state='experience'] .voice-circle {
+    background: rgba(255, 255, 255, 0.04);
+    border: 2px solid rgba(255, 255, 255, 0.16);
+    box-shadow: none;
+}
+
+body[data-app-state='experience'] .voice-circle .pulse-ring {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+body[data-app-state='experience'] .voice-circle.ai .pulse-ring {
+    border-color: rgba(0, 204, 255, 0.35);
+}
+
+body[data-app-state='experience'] .voice-circle.user .pulse-ring {
+    border-color: rgba(255, 255, 255, 0.45);
 }
 
 body[data-app-state='experience'] .compatibility-notice {
-    background: rgba(16, 20, 28, 0.88);
-    border-color: rgba(255, 198, 0, 0.32);
+    background: rgba(34, 34, 34, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(240, 240, 240, 0.82);
 }

@@ -1234,14 +1234,14 @@
             return '';
         }
 
-        const markdownMatch = text.match(/!\[[^\]]*\]\(https?:\/\/[^)\s]+\)/i);
-        if (markdownMatch && markdownMatch[1]) {
+        const markdownMatch = text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
+        if (markdownMatch?.[1]) {
             return sanitizeImageUrl(markdownMatch[1]);
         }
 
-        const urlMatch = text.match(/https?:\/\/[^)\s]+/i);
-        if (urlMatch && urlMatch[0]) {
-            return sanitizeImageUrl(urlMatch[0]);
+        const rawMatch = text.match(/https?:\/\/[^)\s]+/i);
+        if (rawMatch?.[0]) {
+            return sanitizeImageUrl(rawMatch[0]);
         }
 
         return '';
@@ -1270,6 +1270,9 @@
 
         const markdownImageRegex = new RegExp(`!\[[^\]]*\]\(${escapedUrl}\)`, 'gi');
         result = result.replace(markdownImageRegex, '');
+
+        const markdownImageNoUrlRegex = new RegExp(`!\[[^\]]*\]\(\s*\)`, 'gi');
+        result = result.replace(markdownImageNoUrlRegex, '');
 
         const markdownLinkRegex = new RegExp(`\[[^\]]*\]\(${escapedUrl}\)`, 'gi');
         result = result.replace(markdownLinkRegex, '');
