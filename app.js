@@ -57,6 +57,13 @@ function resolveAssetPath(relativePath) {
 }
 
 window.addEventListener('load', async () => {
+    if (background) {
+        if (!background.dataset.state) {
+            background.dataset.state = 'idle';
+        }
+        background.classList.add('is-visible');
+    }
+
     applyTheme(currentTheme);
     await loadSystemPrompt();
     setupSpeechRecognition();
@@ -476,6 +483,25 @@ function removeMarkdownLinkTargets(value) {
         .replace(/\[(?:command|action)[^\]]*\]\([^)]*\)/gi, ' ');
 }
 
+function removeCommandArtifacts(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    let result = value
+        .replace(/\[[^\]]*\bcommand\b[^\]]*\]/gi, ' ')
+        .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
+        .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
+        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
+        .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
+
+    result = result.replace(/^\s*[-*]?\s*(?:command|action)[^\n]*$/gim, ' ');
+
+    return result;
+}
+
 function sanitizeForSpeech(text) {
     if (typeof text !== 'string') {
         return '';
@@ -496,8 +522,9 @@ function sanitizeForSpeech(text) {
         .replace(/\b\S*images?\.pollinations\.ai\S*\b/gi, '');
 
     const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
+    const withoutCommands = removeCommandArtifacts(withoutMarkdownTargets);
 
-    const withoutGenericUrls = withoutMarkdownTargets
+    const withoutGenericUrls = withoutCommands
         .replace(/https?:\/\/\S+/gi, ' ')
         .replace(/\bwww\.[^\s)]+/gi, ' ');
 
@@ -519,6 +546,14 @@ function sanitizeForSpeech(text) {
         }
 
         if (/(?:https?|www|:\/\/|\.com|\.net|\.org|\.io|\.ai|\.co|\.gov|\.edu)/i.test(part)) {
+            return '';
+        }
+
+        if (/\bcommand\b/i.test(part)) {
+            return '';
+        }
+
+        if (/(?:image|artwork|photo)\s+(?:url|link)/i.test(part)) {
             return '';
         }
 
@@ -550,23 +585,10 @@ function sanitizeForSpeech(text) {
         .replace(/\b(?:https?|www)\b/gi, '')
         .replace(/\b[a-z0-9]+\s+dot\s+[a-z0-9]+\b/gi, '')
         .replace(/\b(?:dot\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\b/gi, '')
-        .replace(/\b(?:forward\s+slash|backslash)\b/gi, ' ')
-        .trim();
 
-    for (const token of commandTokens) {
-        const pattern = token.replace(/_/g, '[_\s-]*');
-        const tokenRegex = new RegExp(`\b${pattern}(?:\(\))?`, 'gi');
-        sanitized = sanitized.replace(tokenRegex, ' ');
-        sanitized = sanitized.replace(new RegExp(`\b${pattern}\s+command\b`, 'gi'), ' ');
-    }
-
-    sanitized = sanitized
-        .replace(/\b(?:command|action|directive)\b/gi, ' ')
-        .replace(/\b(?:executing|run|performing)\s+(?:command|action)\b/gi, ' ')
-        .replace(/\bissued\s+(?:command|action)\b/gi, ' ')
-        .replace(/\bvoice\s+tag\b/gi, ' ')
-        .replace(/[\[\]{}()]/g, ' ')
-        .replace(/\s{2,}/g, ' ')
+        .replace(/<\s*>/g, '')
+        .replace(/\bcommand\b/gi, '')
+        .replace(/\b(?:image|artwork|photo)\s+(?:url|link)\b.*$/gim, '')
         .trim();
 
     return sanitized;
@@ -1077,6 +1099,8 @@ function updateBackgroundImage(imageUrl) {
     if (!background || !backgroundImage || !imageUrl) {
         return;
     }
+
+    background.classList.add('is-visible');
 
     if (imageUrl === currentBackgroundUrl && background.dataset.state === 'loaded') {
         return;
