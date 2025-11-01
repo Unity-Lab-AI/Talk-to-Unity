@@ -13,14 +13,14 @@
 </head>
 <body>
     <div class="app-shell">
-        <figure id="hero-stage" class="image-stage" data-state="empty" aria-hidden="true">
-            <img id="hero-image" alt="" loading="lazy" decoding="async" />
-        </figure>
         <header class="status-banner" role="status" aria-live="polite">
             <button id="mute-indicator" class="mute-indicator" data-state="muted" type="button">
                 <span class="indicator-text">Tap or click anywhere to unmute</span>
             </button>
         </header>
+        <figure id="hero-stage" class="image-stage" data-state="empty">
+            <img id="hero-image" alt="" loading="lazy" decoding="async" />
+        </figure>
         <main class="layout" aria-live="polite">
             <section class="voice-stage" role="group" aria-label="Voice activity monitors">
                 <article class="voice-circle ai" data-role="ai" aria-label="Unity is idle">
