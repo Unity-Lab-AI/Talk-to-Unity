@@ -120,8 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (allMet) {
             // Set a cookie to indicate that the checks have passed
             document.cookie = "checks-passed=true;path=/";
-            // Redirect to the AI page
-            window.location.href = '/ai/';
+            // Redirect to the AI page relative to the current location so the
+            // experience keeps working when the site is hosted from a
+            // subdirectory (such as GitHub Pages).
+            const launchUrl = new URL('./AI/index.html', window.location.href);
+            window.location.assign(launchUrl.toString());
         }
     });
 

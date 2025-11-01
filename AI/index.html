@@ -13,17 +13,25 @@
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="./ai.css" />
     <script>
-        (function() {
-            // Check for the "checks-passed" cookie
-            if (document.cookie.indexOf('checks-passed=true') === -1) {
-                // If the cookie is not found, redirect to the landing page
-                window.location.href = '/';
+        (function () {
+            try {
+                const isFileProtocol = window.location.protocol === 'file:';
+                const hasCookie = document.cookie.split(';').some((cookie) =>
+                    cookie.trim().toLowerCase().startsWith('checks-passed=true')
+                );
+
+                if (!hasCookie && !isFileProtocol) {
+                    const fallbackUrl = new URL('../index.html', window.location.href);
+                    window.location.replace(fallbackUrl.toString());
+                }
+            } catch (error) {
+                console.warn('Unable to enforce landing check redirect:', error);
             }
         })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1"></script>
     <script type="module" src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1"></script>
-    <script type="module" defer src="./app.js"></script>
+    <script defer src="./app.js"></script>
 </head>
 <body class="no-js" data-app-state="experience">
     <noscript>
