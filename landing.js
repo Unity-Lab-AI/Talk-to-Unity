@@ -46,6 +46,7 @@ const dependencyChecks = [
     }
 ];
 
+
 function setLaunchButtonState(allMet) {
     if (!launchButton) {
         return;
@@ -57,6 +58,7 @@ function setLaunchButtonState(allMet) {
 
     launchButton.disabled = false;
     launchButton.setAttribute('aria-disabled', 'false');
+
 
     if (allMet) {
         allowLaunchOverride = false;
@@ -84,15 +86,18 @@ function evaluateDependencies({ announce = false } = {}) {
         };
     });
 
-    const allMet = results.every((result) => result.met);
-    updateDependencyUI(results, allMet, { announce });
+    const missing = results.filter((result) => !result.met);
+    const allMet = missing.length === 0;
+
+    updateDependencyUI(results, allMet, { announce, missing });
+    updateLaunchButtonState({ allMet, missing });
 
     setLaunchButtonState(allMet);
 
-    return { results, allMet };
+    return { results, allMet, missing };
 }
 
-function updateDependencyUI(results, allMet, { announce = false } = {}) {
+function updateDependencyUI(results, allMet, { announce = false, missing = [] } = {}) {
     if (dependencyList) {
         results.forEach((result) => {
             const item = dependencyList.querySelector(`[data-dependency="${result.id}"]`);
@@ -100,47 +105,41 @@ function updateDependencyUI(results, allMet, { announce = false } = {}) {
                 return;
             }
 
-            item.dataset.state = result.met ? 'pass' : 'fail';
+            item.dataset.state = result.met ? 'pass' : 'warn';
             const statusElement = item.querySelector('.dependency-status');
             if (statusElement) {
-                statusElement.textContent = result.met ? 'Ready' : 'Action required';
+                statusElement.textContent = result.met ? 'Ready' : 'Check settings';
             }
         });
     }
 
     if (dependencyLight) {
-        dependencyLight.dataset.state = allMet ? 'pass' : 'fail';
+        dependencyLight.dataset.state = allMet ? 'pass' : 'warn';
+        const summary = formatDependencyList(missing);
         dependencyLight.setAttribute(
             'aria-label',
-            allMet ? 'All dependencies satisfied' : 'One or more dependencies are missing'
+            allMet
+                ? 'All dependencies satisfied'
+                : summary
+                ? `Compatibility mode enabled because ${summary} is unavailable`
+                : 'Compatibility mode enabled. Some requirements are missing'
         );
     }
 
     if (dependencySummary) {
-        const unmet = results.filter((result) => !result.met);
-        if (unmet.length === 0) {
+        if (missing.length === 0) {
             dependencySummary.textContent =
                 'All the lights are green! Press "Launch Unity Voice Lab" to start chatting.';
         } else {
-            const firstMissing = unmet[0];
-            const friendlyName = firstMissing?.friendlyName ?? firstMissing?.label ?? 'missing light';
-            dependencySummary.textContent = `The ${friendlyName} is still red. Follow the tip below, then press "Check again."`;
+            const summary = formatDependencyList(missing);
+            dependencySummary.textContent = summary
+                ? `We spotted a few red lights (${summary}). Unity will still launch, but those features may be limited until they turn green.`
+                : 'We spotted a few red lights. Unity will still launch, but some features may be limited.';
         }
     }
 
-    if (announce && !allMet) {
-        const missingNames = results
-            .filter((result) => !result.met)
-            .map((result) => result.friendlyName ?? result.label)
-            .join(', ');
-
-        if (statusMessage) {
-            statusMessage.textContent = missingNames
-                ? `Still missing: ${missingNames}. Work through the tips below and try again.`
-                : 'One or more requirements are still missing. Please review the tips and try again.';
-        }
-    } else if (statusMessage) {
-        statusMessage.textContent = '';
+    if (!announce && !allMet) {
+        setStatusMessage('');
     }
 }
 
@@ -153,8 +152,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const redirected = params.get('missing');
     if (redirected && statusMessage) {
-        statusMessage.textContent =
-            'We redirected you back here because one or more requirements were missing. Review the tips below and run the check again.';
+        setStatusMessage(
+            'We redirected you back here because one or more requirements were missing. Review the tips below and run the check again.',
+            'warning'
+        );
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 

@@ -1,7 +1,7 @@
+
 from pathlib import Path
 
 import requests
-
 
 def test_public_page_contains_call_to_action():
     candidate_urls = [
@@ -32,3 +32,4 @@ def test_public_page_contains_call_to_action():
 
     combined_html = "\n".join(html_sources)
     assert "Tap or click anywhere to unmute" in combined_html
+
