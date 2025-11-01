@@ -465,8 +465,23 @@ function sanitizeForSpeech(text) {
         .replace(/https?:\/\/\S+/gi, ' ')
         .replace(/\bwww\.[^\s)]+/gi, ' ');
 
-    const parts = withoutGenericUrls.split(/(\s+)/);
-    const sanitizedParts = parts.map((part) => (isLikelyUrlSegment(part) ? '' : part));
+    const withoutSpacedUrls = withoutGenericUrls
+        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*[\w\-./?%#&=]+/gi, ' ')
+        .replace(/\bhttps?\b/gi, ' ')
+        .replace(/\bwww\b/gi, ' ');
+
+    const parts = withoutSpacedUrls.split(/(\s+)/);
+    const sanitizedParts = parts.map((part) => {
+        if (isLikelyUrlSegment(part)) {
+            return '';
+        }
+
+        if (/(?:https?|www|:\/\/|\.com|\.net|\.org|\.io|\.ai|\.co|\.gov|\.edu)/i.test(part)) {
+            return '';
+        }
+
+        return part;
+    });
     const sanitized = sanitizedParts
         .join('')
         .replace(/\s{2,}/g, ' ')
@@ -474,6 +489,9 @@ function sanitizeForSpeech(text) {
         .replace(/\(\s*\)/g, '')
         .replace(/\[\s*\]/g, '')
         .replace(/\{\s*\}/g, '')
+        .replace(/\b(?:https?|www)\b/gi, '')
+        .replace(/\b[a-z0-9]+\s+dot\s+[a-z0-9]+\b/gi, '')
+        .replace(/\b(?:dot\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\b/gi, '')
         .trim();
 
     return sanitized;
