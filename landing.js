@@ -101,8 +101,9 @@
     }
 
     function showRecheckInProgress() {
-        setLaunchButtonState(false);
         if (launchButton) {
+            launchButton.disabled = true;
+            launchButton.setAttribute('aria-disabled', 'true');
             launchButton.dataset.state = 'pending';
         }
 
@@ -135,11 +136,10 @@
         }
 
         const { allMet, missing, results } = result;
-        const mode = allMet ? 'standard' : 'compatibility';
 
         window.dispatchEvent(
             new CustomEvent('talk-to-unity:launch', {
-                detail: { allMet, missing, results, mode }
+                detail: { allMet, missing, results }
             })
         );
     }
@@ -202,26 +202,29 @@
 
     function handleLaunchEvent(event) {
         const detail = event?.detail ?? {};
-        const { allMet = false, missing = [], mode = 'standard' } = detail;
-
-        const launchUrl = resolveAppLaunchUrl();
-        if (!launchUrl) {
-            return;
-        }
+        const { allMet = false, missing = [] } = detail;
 
         const summary = formatDependencyList(missing);
+        const tone = allMet ? 'success' : 'warning';
         const launchMessage = allMet
-            ? 'All systems look good. Redirecting to Talk to Unity…'
+            ? 'All systems look good. Launching Talk to Unity…'
             : summary
-            ? `Launching Talk to Unity in compatibility mode. Some features may be limited: ${summary}.`
-            : 'Launching Talk to Unity in compatibility mode. Some features may be limited.';
+            ? `Launching Talk to Unity. Some features may be limited until we resolve: ${summary}.`
+            : 'Launching Talk to Unity. Some features may be limited because certain capabilities are unavailable.';
 
-        setStatusMessage(launchMessage, allMet ? 'success' : 'warning');
+        setStatusMessage(launchMessage, tone);
 
         document.cookie = 'checks-passed=true;path=/';
 
-        if (mode === 'compatibility') {
-            dependencyLight?.setAttribute('aria-label', 'Launching Talk to Unity in compatibility mode');
+        if (!allMet) {
+            dependencyLight?.setAttribute(
+                'aria-label',
+                summary
+                    ? `Launching with limited functionality while we address: ${summary}`
+                    : 'Launching with limited functionality while some requirements are addressed'
+            );
+        } else {
+            dependencyLight?.setAttribute('aria-label', 'All dependencies satisfied. Launching Talk to Unity');
         }
 
         if (launchButton) {
@@ -230,7 +233,13 @@
             launchButton.dataset.state = 'pending';
         }
 
-        window.location.assign(launchUrl);
+        const appRoot = document.getElementById('app-root');
+        if (!appRoot) {
+            const launchUrl = resolveAppLaunchUrl();
+            if (launchUrl) {
+                window.location.assign(launchUrl);
+            }
+        }
     }
 
     window.addEventListener('talk-to-unity:launch', handleLaunchEvent);
@@ -238,15 +247,6 @@
     window.addEventListener('focus', () => {
         evaluateDependencies();
     });
-
-    function setLaunchButtonState(allMet) {
-        if (!launchButton) {
-            return;
-        }
-
-        launchButton.disabled = !allMet;
-        launchButton.setAttribute('aria-disabled', String(!allMet));
-    }
 
     function evaluateDependencies({ announce = false } = {}) {
         const results = dependencyChecks.map((descriptor) => {
@@ -269,16 +269,14 @@
         updateDependencyUI(results, allMet, { announce, missing });
         updateLaunchButtonState({ allMet, missing });
 
-        setLaunchButtonState(allMet);
-
         if (announce) {
             if (allMet) {
                 setStatusMessage('All systems look good. Launching Talk to Unity…', 'success');
             } else {
                 const summary = formatDependencyList(missing);
                 const message = summary
-                    ? `Starting Talk to Unity in compatibility mode. Some features may be limited: ${summary}.`
-                    : 'Starting Talk to Unity in compatibility mode. Some browser features may be limited.';
+                    ? `Some browser features are unavailable: ${summary}. You can continue, but certain Unity abilities may be limited.`
+                    : 'Some browser features are unavailable. You can continue, but certain Unity abilities may be limited.';
                 setStatusMessage(message, 'warning');
             }
         } else if (allMet && statusMessage?.textContent) {
@@ -324,8 +322,8 @@
             } else {
                 const summary = formatDependencyList(missing);
                 dependencySummary.textContent = summary
-                    ? `Alerts: ${summary}. Follow the fix steps below, then press "Check again."`
-                    : 'Alerts detected. Follow the fix steps below, then press "Check again."';
+                    ? `Alerts: ${summary}. You can still launch, but features may be limited until these items are resolved.`
+                    : 'Alerts detected. You can still launch, but features may be limited until the issues are resolved.';
             }
         }
 
@@ -343,7 +341,10 @@
                     const readyResults = dependencyChecks.map((descriptor) => ({ ...descriptor, met: true }));
                     updateDependencyUI(readyResults, true, { announce: false, missing: [] });
                     updateLaunchButtonState({ allMet: true, missing: [] });
-                    setLaunchButtonState(true);
+                    if (launchButton) {
+                        launchButton.disabled = false;
+                        launchButton.setAttribute('aria-disabled', 'false');
+                    }
                 }
             },
             configurable: true,

@@ -14,7 +14,6 @@
     --surface-color: transparent;
     --surface-highlight: rgba(148, 163, 184, 0.2);
     --surface-glow: rgba(56, 189, 248, 0.35);
-    --compat-warning: rgba(250, 204, 21, 0.22);
 }
 
 body[data-theme='light'] {
@@ -32,7 +31,6 @@ body[data-theme='light'] {
     --surface-color: rgba(255, 255, 255, 0.78);
     --surface-highlight: rgba(59, 130, 246, 0.12);
     --surface-glow: rgba(59, 130, 246, 0.28);
-    --compat-warning: rgba(255, 229, 153, 0.6);
 }
 
 * {
@@ -596,24 +594,6 @@ body.no-js #hero-stage {
     align-self: stretch;
 }
 
-.compatibility-notice {
-    margin-top: 12px;
-    padding: 12px 18px;
-    border-radius: 14px;
-    border: none;
-    background: transparent;
-    color: var(--muted-text);
-    font-size: 0.95rem;
-    line-height: 1.6;
-    text-align: center;
-    max-width: min(520px, 100%);
-    box-shadow: none;
-}
-
-body[data-theme='light'] .compatibility-notice {
-    color: var(--text-color);
-}
-
 .no-js-banner {
     margin: clamp(12px, 4vh, 32px) auto 0;
     padding: 12px 20px;
@@ -750,15 +730,6 @@ body.no-js .mute-indicator {
 .mute-indicator[data-state="listening"] {
     color: var(--text-color);
     box-shadow: 0 0 0 2px rgba(67, 217, 189, 0.6), 0 0 32px rgba(67, 217, 189, 0.28);
-}
-
-.mute-indicator[data-state="compat"] {
-    color: #f5f7fa;
-    box-shadow: 0 0 0 2px rgba(255, 198, 0, 0.6), 0 0 28px rgba(255, 198, 0, 0.3);
-}
-
-:root[data-theme='light'] .mute-indicator[data-state="compat"] {
-    color: #5f3701;
 }
 
 .sr-only {

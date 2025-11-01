@@ -104,11 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     evaluateDependencies();
 
     launchButton?.addEventListener('click', async () => {
-        const { allMet } = evaluateDependencies();
-        if (!allMet) {
-            return;
-        }
-
+        evaluateDependencies({ announce: true });
         await startApplication();
     });
 
@@ -142,8 +138,8 @@ function evaluateDependencies({ announce = false } = {}) {
     updateDependencyUI(results, allMet, { announce });
 
     if (launchButton) {
-        launchButton.disabled = !allMet;
-        launchButton.setAttribute('aria-disabled', String(!allMet));
+        launchButton.disabled = false;
+        launchButton.setAttribute('aria-disabled', 'false');
     }
 
     return { results, allMet };
@@ -178,9 +174,14 @@ function updateDependencyUI(results, allMet, { announce = false } = {}) {
         if (unmet.length === 0) {
             dependencySummary.textContent =
                 'All systems are ready. Launch the Voice Lab to begin your Unity AI conversation.';
+        } else if (unmet.length === 1) {
+            const [missingCapability] = unmet;
+            dependencySummary.textContent =
+                `${missingCapability.label} is unavailable. You can launch now, but some features may be limited until it is resolved.`;
         } else {
-            const firstMissing = unmet[0]?.label ?? 'the required capabilities';
-            dependencySummary.textContent = `Resolve ${firstMissing} and re-run the check.`;
+            const missingLabels = unmet.map((result) => result.label).join(', ');
+            dependencySummary.textContent =
+                `Multiple capabilities are unavailable (${missingLabels}). You can launch now, but some features may be limited until they are resolved.`;
         }
     }
 
