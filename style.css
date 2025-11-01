@@ -75,11 +75,21 @@ html {
     aspect-ratio: 16 / 10;
     border-radius: clamp(18px, 4vw, 28px);
     overflow: hidden;
-    display: none;
+    display: block;
     background: rgba(12, 14, 24, 0.6);
     box-shadow: 0 48px 120px -64px rgba(0, 0, 0, 0.85);
-    transition: transform 0.6s ease, box-shadow 0.6s ease;
+    transition: transform 0.6s ease, box-shadow 0.6s ease, opacity 0.5s ease;
     margin: 0;
+    opacity: 0;
+}
+
+#background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(67, 217, 189, 0.12), rgba(124, 92, 255, 0.18));
+    opacity: 0;
+    transition: opacity 0.6s ease;
 }
 
 #background::after {
@@ -102,8 +112,11 @@ html {
     opacity: 0;
 }
 
+#background.is-visible {
+    opacity: 1;
+}
+
 #background.has-image {
-    display: block;
     pointer-events: auto;
 }
 
@@ -125,9 +138,23 @@ html {
     transform: scale(1);
 }
 
+#background[data-state='loading']::before,
+#background[data-state='idle']::before {
+    opacity: 1;
+}
+
+#background[data-state='loading'] img {
+    opacity: 0;
+}
+
 #background[data-state='loading']::after {
     opacity: 0.75;
     backdrop-filter: blur(6px);
+}
+
+#background[data-state='error']::before {
+    opacity: 1;
+    background: linear-gradient(135deg, rgba(255, 89, 125, 0.24), rgba(255, 189, 92, 0.24));
 }
 
 :root[data-theme='light'] #background {
@@ -137,6 +164,15 @@ html {
 
 :root[data-theme='light'] #background::after {
     background: linear-gradient(180deg, rgba(250, 250, 255, 0) 20%, rgba(240, 240, 250, 0.65) 100%);
+}
+
+:root[data-theme='light'] #background[data-state='loading']::before,
+:root[data-theme='light'] #background[data-state='idle']::before {
+    background: linear-gradient(135deg, rgba(67, 217, 189, 0.18), rgba(124, 92, 255, 0.18));
+}
+
+:root[data-theme='light'] #background[data-state='error']::before {
+    background: linear-gradient(135deg, rgba(255, 89, 125, 0.18), rgba(255, 189, 92, 0.18));
 }
 
 .status-banner {

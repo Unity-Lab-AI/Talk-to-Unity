@@ -53,6 +53,13 @@ function resolveAssetPath(relativePath) {
 }
 
 window.addEventListener('load', async () => {
+    if (background) {
+        if (!background.dataset.state) {
+            background.dataset.state = 'idle';
+        }
+        background.classList.add('is-visible');
+    }
+
     applyTheme(currentTheme);
     await loadSystemPrompt();
     setupSpeechRecognition();
@@ -471,6 +478,25 @@ function removeMarkdownLinkTargets(value) {
         });
 }
 
+function removeCommandArtifacts(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    let result = value
+        .replace(/\[[^\]]*\bcommand\b[^\]]*\]/gi, ' ')
+        .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
+        .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
+        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
+        .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
+
+    result = result.replace(/^\s*[-*]?\s*(?:command|action)[^\n]*$/gim, ' ');
+
+    return result;
+}
+
 function sanitizeForSpeech(text) {
     if (typeof text !== 'string') {
         return '';
@@ -481,8 +507,9 @@ function sanitizeForSpeech(text) {
         .replace(/\b\S*images?\.pollinations\.ai\S*\b/gi, '');
 
     const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
+    const withoutCommands = removeCommandArtifacts(withoutMarkdownTargets);
 
-    const withoutGenericUrls = withoutMarkdownTargets
+    const withoutGenericUrls = withoutCommands
         .replace(/https?:\/\/\S+/gi, ' ')
         .replace(/\bwww\.[^\s)]+/gi, ' ');
 
@@ -501,6 +528,14 @@ function sanitizeForSpeech(text) {
             return '';
         }
 
+        if (/\bcommand\b/i.test(part)) {
+            return '';
+        }
+
+        if (/(?:image|artwork|photo)\s+(?:url|link)/i.test(part)) {
+            return '';
+        }
+
         return part;
     });
     const sanitized = sanitizedParts
@@ -513,6 +548,9 @@ function sanitizeForSpeech(text) {
         .replace(/\b(?:https?|www)\b/gi, '')
         .replace(/\b[a-z0-9]+\s+dot\s+[a-z0-9]+\b/gi, '')
         .replace(/\b(?:dot\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\b/gi, '')
+        .replace(/<\s*>/g, '')
+        .replace(/\bcommand\b/gi, '')
+        .replace(/\b(?:image|artwork|photo)\s+(?:url|link)\b.*$/gim, '')
         .trim();
 
     return sanitized;
@@ -982,6 +1020,8 @@ function updateBackgroundImage(imageUrl) {
     if (!background || !backgroundImage || !imageUrl) {
         return;
     }
+
+    background.classList.add('is-visible');
 
     if (imageUrl === currentBackgroundUrl && background.dataset.state === 'loaded') {
         return;
