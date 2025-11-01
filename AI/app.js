@@ -37,6 +37,54 @@ let appStarted = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
+class SpeechRecognitionAdapter {
+    constructor() {
+        if (SpeechRecognition) {
+            this.recognition = new SpeechRecognition();
+            this.recognition.continuous = true;
+            this.recognition.lang = 'en-US';
+            this.recognition.interimResults = false;
+            this.recognition.maxAlternatives = 1;
+        } else if (window.Vosklet) {
+            this.recognition = new window.Vosklet();
+        } else {
+            throw new Error('Speech recognition is not supported in this browser.');
+        }
+    }
+
+    start() {
+        this.recognition.start();
+    }
+
+    stop() {
+        this.recognition.stop();
+    }
+
+    set onresult(callback) {
+        this.recognition.onresult = callback;
+    }
+
+    set onerror(callback) {
+        this.recognition.onerror = callback;
+    }
+
+    set onstart(callback) {
+        this.recognition.onstart = callback;
+    }
+
+    set onaudiostart(callback) {
+        this.recognition.onaudiostart = callback;
+    }
+
+    set onspeechend(callback) {
+        this.recognition.onspeechend = callback;
+    }
+
+    set onend(callback) {
+        this.recognition.onend = callback;
+    }
+}
+
 const dependencyChecks = [
     {
         id: 'secure-context',
@@ -48,7 +96,7 @@ const dependencyChecks = [
     {
         id: 'speech-recognition',
         label: 'Web Speech Recognition API',
-        check: () => Boolean(SpeechRecognition)
+        check: () => Boolean(SpeechRecognition || window.Vosklet)
     },
     {
         id: 'speech-synthesis',
@@ -402,21 +450,17 @@ async function loadSystemPrompt() {
 }
 
 function setupSpeechRecognition() {
-    if (!SpeechRecognition) {
-        console.error('Speech recognition is not supported in this browser.');
-        alert('Speech recognition is not supported in this browser.');
+    try {
+        recognition = new SpeechRecognitionAdapter();
+    } catch (error) {
+        console.error(error);
+        alert(error.message);
         setCircleState(userCircle, {
             label: 'Speech recognition is not supported in this browser',
             error: true
         });
         return;
     }
-
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
         console.log('Voice recognition started.');

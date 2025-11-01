@@ -22,7 +22,7 @@
             id: 'speech-recognition',
             label: 'Web Speech Recognition API',
             friendlyName: 'speech listening light',
-            check: () => Boolean(SpeechRecognition)
+            check: () => Boolean(SpeechRecognition || window.Vosklet)
         },
         {
             id: 'speech-synthesis',
@@ -155,6 +155,13 @@
         }
 
         landingInitialized = true;
+
+        if (!SpeechRecognition) {
+            const voskletScript = document.createElement('script');
+            voskletScript.src = 'https://unpkg.com/vosklet@0.0.12/dist/vosklet.mjs';
+            voskletScript.type = 'module';
+            document.head.appendChild(voskletScript);
+        }
 
         evaluateDependencies();
 
