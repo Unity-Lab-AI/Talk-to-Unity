@@ -131,15 +131,15 @@ document.addEventListener('DOMContentLoaded', () => {
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
         if (allMet) {
-            // Set a cookie to indicate that the checks have passed
             document.cookie = "checks-passed=true;path=/";
-            // Redirect to the AI page relative to the current location so the
-            // experience keeps working when the site is hosted from a
-            // subdirectory (such as GitHub Pages). We point at the directory
-            // itself so browsers don't expose the underlying index.html file
-            // in the address bar.
-            const launchUrl = new URL('./AI/', window.location.href);
-            window.location.assign(launchUrl.toString());
+            // Show the AI app and hide the landing page
+            const landingSection = document.getElementById('landing');
+            const appRoot = document.getElementById('app-root');
+            if (landingSection && appRoot) {
+                landingSection.style.display = 'none';
+                appRoot.hidden = false;
+                window.startApplication();
+            }
         }
     });
 
