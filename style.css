@@ -69,12 +69,15 @@ html {
     gap: clamp(28px, 7vh, 72px);
 }
 
-#background {
+.image-stage {
     position: relative;
+    margin: 0;
+    display: block;
     width: min(960px, 100%);
     aspect-ratio: 16 / 10;
     border-radius: clamp(18px, 4vw, 28px);
     overflow: hidden;
+
     display: block;
     background: rgba(12, 14, 24, 0.6);
     box-shadow: 0 48px 120px -64px rgba(0, 0, 0, 0.85);
@@ -92,7 +95,22 @@ html {
     transition: opacity 0.6s ease;
 }
 
-#background::after {
+#background {
+    position: relative;
+}
+
+.image-stage::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 30%, rgba(76, 91, 255, 0.12), transparent 60%),
+        radial-gradient(circle at 70% 65%, rgba(67, 217, 189, 0.16), transparent 62%);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    z-index: 0;
+}
+
+.image-stage::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -101,7 +119,9 @@ html {
     transition: opacity 0.6s ease;
 }
 
-#background img {
+.image-stage img {
+    position: relative;
+    z-index: 1;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -112,12 +132,14 @@ html {
     opacity: 0;
 }
 
+
 #background.is-visible {
     opacity: 1;
 }
 
 #background.has-image {
     pointer-events: auto;
+    opacity: 1;
 }
 
 #background.has-image:hover {
