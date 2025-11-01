@@ -128,6 +128,22 @@ function showRecheckInProgress() {
 document.addEventListener('DOMContentLoaded', () => {
     evaluateDependencies();
 
+    launchButton?.addEventListener('click', () => {
+        const result = evaluateDependencies({ announce: true });
+        if (!result) {
+            return;
+        }
+
+        const { allMet, missing, results } = result;
+        const mode = allMet ? 'standard' : 'compatibility';
+
+        window.dispatchEvent(
+            new CustomEvent('talk-to-unity:launch', {
+                detail: { allMet, missing, results, mode }
+            })
+        );
+    });
+
     recheckButton?.addEventListener('click', () => {
         showRecheckInProgress();
         evaluateDependencies({ announce: true });
