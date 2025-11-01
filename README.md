@@ -12,7 +12,7 @@ Talk to Unity is a browser-based voice companion that connects visitors with the
 
 To enjoy the full experience make sure you have:
 
-- A modern browser with support for the Web Speech APIs (Chrome or Edge work best, Safari on desktop also supports the features).
+- A modern browser with support for the Web Speech APIs (Chrome or Edge work best, Safari on desktop also supports the features. Firefox is not supported at this time.).
 - HTTPS hosting or `localhost` so the secure-context check passes.
 - Speakers or headphones so you can hear Unity’s replies.
 - A microphone that the browser is allowed to access.
