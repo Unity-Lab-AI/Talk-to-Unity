@@ -1,38 +1,16 @@
 :root,
 :root[data-theme='dark'] {
     color-scheme: dark;
-    --bg-color: #0b0b0f;
     --border-color: rgba(255, 255, 255, 0.18);
     --text-color: #f5f5f5;
     --muted-text: rgba(245, 245, 245, 0.82);
-    --circle-bg: rgba(12, 14, 24, 0.38);
-    --indicator-bg: rgba(12, 14, 24, 0.7);
-    --indicator-border: rgba(255, 255, 255, 0.18);
-    --indicator-active-bg: rgba(67, 217, 189, 0.16);
 }
 
 body[data-theme='light'] {
     color-scheme: light;
-    --bg-color: #f6f7fb;
     --border-color: rgba(16, 16, 24, 0.16);
     --text-color: #14141a;
     --muted-text: rgba(20, 20, 26, 0.72);
-    --circle-bg: rgba(250, 250, 255, 0.55);
-    --indicator-bg: rgba(240, 242, 255, 0.82);
-    --indicator-border: rgba(16, 16, 24, 0.18);
-    --indicator-active-bg: rgba(67, 217, 189, 0.24);
-}
-
-:root[data-theme='light'] {
-    color-scheme: light;
-    --bg-color: #f6f7fb;
-    --border-color: rgba(0, 0, 0, 0.16);
-    --text-color: #0b0b0f;
-    --muted-text: rgba(11, 11, 15, 0.7);
-}
-
-:root[data-theme='light'] body {
-    background-color: #f6f7fb;
 }
 
 * {
@@ -44,16 +22,11 @@ body {
     min-height: 100vh;
     font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
     color: var(--text-color);
-    background-color: transparent;
     display: flex;
     justify-content: center;
     align-items: stretch;
     width: 100%;
     position: relative;
-}
-
-html {
-    background-color: var(--bg-color);
 }
 
 .app-shell {
@@ -63,138 +36,40 @@ html {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: space-between;
     align-items: center;
-    padding: clamp(32px, 12vh, 140px) clamp(24px, 8vw, 120px);
-    gap: clamp(28px, 7vh, 72px);
+    padding: clamp(16px, 4vh, 32px) clamp(16px, 6vw, 80px) clamp(24px, 6vh, 80px);
 }
 
-.image-stage {
-    position: relative;
+#hero-stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
     margin: 0;
-    display: block;
-    width: min(960px, 100%);
-    aspect-ratio: 16 / 10;
-    border-radius: clamp(18px, 4vw, 28px);
-    overflow: hidden;
-
-    display: block;
-    background: rgba(12, 14, 24, 0.6);
-    box-shadow: 0 48px 120px -64px rgba(0, 0, 0, 0.85);
-    transition: transform 0.6s ease, box-shadow 0.6s ease, opacity 0.5s ease;
-    margin: 0;
+    pointer-events: none;
+    z-index: 20;
     opacity: 0;
+    transition: opacity 0.5s ease;
 }
 
-#background::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(67, 217, 189, 0.12), rgba(124, 92, 255, 0.18));
-    opacity: 0;
-    transition: opacity 0.6s ease;
+#hero-stage.is-visible {
+    opacity: 1;
 }
 
-#background {
+#hero-stage img {
     position: relative;
-}
-
-.image-stage::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 30% 30%, rgba(76, 91, 255, 0.12), transparent 60%),
-        radial-gradient(circle at 70% 65%, rgba(67, 217, 189, 0.16), transparent 62%);
-    opacity: 0;
-    transition: opacity 0.6s ease;
-    z-index: 0;
-}
-
-.image-stage::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(5, 7, 12, 0) 20%, rgba(5, 7, 12, 0.55) 100%);
-    opacity: 0;
-    transition: opacity 0.6s ease;
-}
-
-.image-stage img {
-    position: relative;
-    z-index: 1;
+    max-width: min(960px, 90vw);
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    filter: saturate(1.05);
-    transform: scale(1.04);
-    transition: transform 1.2s ease, opacity 0.6s ease;
+    height: auto;
+    object-fit: contain;
+    transition: transform 0.8s ease, opacity 0.5s ease;
     opacity: 0;
 }
 
-
-#background.is-visible {
+#hero-stage.has-image img {
     opacity: 1;
-}
-
-#background.has-image {
-    pointer-events: auto;
-    opacity: 1;
-}
-
-#background.has-image:hover {
-    transform: scale(1.01);
-    box-shadow: 0 54px 138px -64px rgba(0, 0, 0, 0.92);
-}
-
-:root[data-theme='light'] #background.has-image:hover {
-    box-shadow: 0 46px 128px -60px rgba(60, 72, 90, 0.45);
-}
-
-#background.has-image::after {
-    opacity: 1;
-}
-
-#background.has-image img {
-    opacity: 1;
-    transform: scale(1);
-}
-
-#background[data-state='loading']::before,
-#background[data-state='idle']::before {
-    opacity: 1;
-}
-
-#background[data-state='loading'] img {
-    opacity: 0;
-}
-
-#background[data-state='loading']::after {
-    opacity: 0.75;
-    backdrop-filter: blur(6px);
-}
-
-#background[data-state='error']::before {
-    opacity: 1;
-    background: linear-gradient(135deg, rgba(255, 89, 125, 0.24), rgba(255, 189, 92, 0.24));
-}
-
-:root[data-theme='light'] #background {
-    background: rgba(245, 245, 250, 0.9);
-    box-shadow: 0 40px 110px -60px rgba(60, 72, 90, 0.35);
-}
-
-:root[data-theme='light'] #background::after {
-    background: linear-gradient(180deg, rgba(250, 250, 255, 0) 20%, rgba(240, 240, 250, 0.65) 100%);
-}
-
-:root[data-theme='light'] #background[data-state='loading']::before,
-:root[data-theme='light'] #background[data-state='idle']::before {
-    background: linear-gradient(135deg, rgba(67, 217, 189, 0.18), rgba(124, 92, 255, 0.18));
-}
-
-:root[data-theme='light'] #background[data-state='error']::before {
-    background: linear-gradient(135deg, rgba(255, 89, 125, 0.18), rgba(255, 189, 92, 0.18));
 }
 
 .status-banner {
@@ -202,6 +77,7 @@ html {
     display: flex;
     justify-content: center;
     align-items: center;
+    align-self: stretch;
 }
 
 .layout {
@@ -212,12 +88,13 @@ html {
     justify-content: center;
     position: relative;
     z-index: 2;
+    padding-bottom: clamp(8px, 3vh, 24px);
 }
 
 .voice-stage {
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-end;
     gap: clamp(24px, 14vw, 140px);
     width: min(960px, 100%);
 }
@@ -231,7 +108,6 @@ html {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--circle-bg);
     backdrop-filter: blur(10px);
     isolation: isolate;
     overflow: hidden;
@@ -239,7 +115,6 @@ html {
 }
 
 :root[data-theme='light'] .voice-circle {
-    background: rgba(255, 255, 255, 0.72);
     border-color: rgba(0, 0, 0, 0.12);
 }
 
@@ -286,14 +161,12 @@ html {
     align-self: center;
     padding: 14px 24px;
     border-radius: 999px;
-    border: none;
-    background: var(--indicator-bg);
-    border: 1px solid var(--indicator-border);
+    border: 1px solid var(--border-color);
     color: var(--muted-text);
     font-size: clamp(0.9rem, 2.2vw, 1rem);
     letter-spacing: 0.04em;
     cursor: pointer;
-    transition: transform 0.25s ease, background 0.25s ease, opacity 0.25s ease;
+    transition: transform 0.25s ease, opacity 0.25s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -302,7 +175,6 @@ html {
 }
 
 :root[data-theme='light'] .mute-indicator {
-    background: rgba(255, 255, 255, 0.82);
     border-color: rgba(0, 0, 0, 0.16);
     color: var(--text-color);
 }
@@ -315,11 +187,9 @@ html {
 .mute-indicator:hover,
 .mute-indicator:active {
     transform: translateY(-2px) scale(1.01);
-    background: rgba(12, 14, 24, 0.82);
 }
 
 .mute-indicator[data-state="listening"] {
-    background: var(--indicator-active-bg);
     border-color: rgba(67, 217, 189, 0.5);
     color: var(--text-color);
 }
@@ -350,28 +220,22 @@ html {
 
 @media (max-width: 720px) {
     .app-shell {
-        padding: clamp(28px, 10vh, 80px) clamp(16px, 6vw, 32px);
-        gap: clamp(20px, 6vh, 48px);
+        padding: clamp(16px, 6vh, 32px) clamp(16px, 6vw, 32px) clamp(24px, 8vh, 48px);
     }
 
-    #background {
+    #hero-stage {
         aspect-ratio: 4 / 5;
         border-radius: clamp(16px, 8vw, 24px);
     }
 
     .voice-stage {
         flex-direction: column;
-        gap: clamp(32px, 14vh, 80px);
+        gap: clamp(24px, 12vh, 64px);
     }
 }
 
 @media (max-width: 520px) {
-    .layout {
-        padding-top: clamp(48px, 12vh, 80px);
-        padding-bottom: clamp(48px, 18vh, 120px);
-    }
-
-    #background {
+    #hero-stage {
         aspect-ratio: 3 / 4;
     }
 }

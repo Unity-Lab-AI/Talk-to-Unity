@@ -1,5 +1,5 @@
-const background = document.getElementById('background');
-const backgroundImage = document.getElementById('background-image');
+const heroStage = document.getElementById('hero-stage');
+const heroImage = document.getElementById('hero-image');
 const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
@@ -11,15 +11,15 @@ let systemPrompt = '';
 let recognition = null;
 let isMuted = true;
 let hasMicPermission = false;
-let currentBackgroundUrl = '';
-let pendingBackgroundUrl = '';
+let currentHeroUrl = '';
+let pendingHeroUrl = '';
 let currentTheme = 'dark';
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
-if (background && !background.dataset.state) {
-    background.dataset.state = 'empty';
+if (heroStage && !heroStage.dataset.state) {
+    heroStage.dataset.state = 'empty';
 }
 
 const currentScript = document.currentScript;
@@ -57,11 +57,11 @@ function resolveAssetPath(relativePath) {
 }
 
 window.addEventListener('load', async () => {
-    if (background) {
-        if (!background.dataset.state) {
-            background.dataset.state = 'idle';
+    if (heroStage) {
+        if (!heroStage.dataset.state) {
+            heroStage.dataset.state = 'idle';
         }
-        background.classList.add('is-visible');
+        heroStage.classList.add('is-visible');
     }
 
     applyTheme(currentTheme);
@@ -1065,7 +1065,7 @@ async function getAIResponse(userInput) {
         }
 
         if (imageUrlFromResponse) {
-            updateBackgroundImage(imageUrlFromResponse);
+            updateHeroImage(imageUrlFromResponse);
         }
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
@@ -1084,35 +1084,35 @@ async function getAIResponse(userInput) {
 }
 
 function getImageUrl() {
-    if (currentBackgroundUrl) {
-        return currentBackgroundUrl;
+    if (currentHeroUrl) {
+        return currentHeroUrl;
     }
 
-    if (backgroundImage?.getAttribute('src')) {
-        return backgroundImage.getAttribute('src');
+    if (heroImage?.getAttribute('src')) {
+        return heroImage.getAttribute('src');
     }
 
     return '';
 }
 
-function updateBackgroundImage(imageUrl) {
-    if (!background || !backgroundImage || !imageUrl) {
+function updateHeroImage(imageUrl) {
+    if (!heroStage || !heroImage || !imageUrl) {
         return;
     }
 
-    background.classList.add('is-visible');
+    heroStage.classList.add('is-visible');
 
-    if (imageUrl === currentBackgroundUrl && background.dataset.state === 'loaded') {
+    if (imageUrl === currentHeroUrl && heroStage.dataset.state === 'loaded') {
         return;
     }
 
-    const hadImage = background.classList.contains('has-image');
+    const hadImage = heroStage.classList.contains('has-image');
 
-    pendingBackgroundUrl = imageUrl;
-    background.dataset.state = 'loading';
+    pendingHeroUrl = imageUrl;
+    heroStage.dataset.state = 'loading';
     if (!hadImage) {
-        background.classList.remove('has-image');
-        backgroundImage.removeAttribute('src');
+        heroStage.classList.remove('has-image');
+        heroImage.removeAttribute('src');
     }
 
     const image = new Image();
@@ -1120,29 +1120,29 @@ function updateBackgroundImage(imageUrl) {
     image.referrerPolicy = 'no-referrer';
 
     image.onload = () => {
-        if (pendingBackgroundUrl !== imageUrl) {
+        if (pendingHeroUrl !== imageUrl) {
             return;
         }
 
-        currentBackgroundUrl = imageUrl;
-        pendingBackgroundUrl = '';
-        backgroundImage.src = imageUrl;
-        background.dataset.state = 'loaded';
-        background.classList.add('has-image');
+        currentHeroUrl = imageUrl;
+        pendingHeroUrl = '';
+        heroImage.src = imageUrl;
+        heroStage.dataset.state = 'loaded';
+        heroStage.classList.add('has-image');
     };
 
     image.onerror = (error) => {
-        if (pendingBackgroundUrl === imageUrl) {
-            pendingBackgroundUrl = '';
+        if (pendingHeroUrl === imageUrl) {
+            pendingHeroUrl = '';
         }
         if (!hadImage) {
-            background.dataset.state = 'error';
-            background.classList.remove('has-image');
-            backgroundImage.removeAttribute('src');
+            heroStage.dataset.state = 'error';
+            heroStage.classList.remove('has-image');
+            heroImage.removeAttribute('src');
         } else {
-            background.dataset.state = 'loaded';
+            heroStage.dataset.state = 'loaded';
         }
-        console.error('Failed to load background image:', error);
+        console.error('Failed to load hero image:', error);
     };
 
     image.src = imageUrl;
