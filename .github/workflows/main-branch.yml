@@ -1,24 +1,17 @@
 name: Unified Build, Test, and Deploy
 
+
 on:
   push:
     branches: [main]
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-      - edited
-  workflow_dispatch:
+    branches: [main]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: talk-to-unity-ci
   cancel-in-progress: true
 
 jobs:
