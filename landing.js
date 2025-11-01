@@ -14,6 +14,9 @@ const launchButton = document.getElementById('launch-app');
 const recheckButton = document.getElementById('recheck-dependencies');
 const statusMessage = document.getElementById('status-message');
 
+let allowLaunchOverride = false;
+let defaultLaunchLabel = '';
+
 const dependencyChecks = [
     {
         id: 'secure-context',
@@ -43,52 +46,29 @@ const dependencyChecks = [
     }
 ];
 
-function formatDependencyList(items) {
-    const labels = items
-        .map((item) => item.friendlyName ?? item.label ?? item.id)
-        .filter(Boolean);
 
-    if (labels.length === 0) {
-        return '';
-    }
-
-    if (labels.length === 1) {
-        return labels[0];
-    }
-
-    const head = labels.slice(0, -1).join(', ');
-    const tail = labels[labels.length - 1];
-    return `${head} and ${tail}`;
-}
-
-function setStatusMessage(message, tone = 'info') {
-    if (!statusMessage) {
-        return;
-    }
-
-    statusMessage.textContent = message;
-    if (message) {
-        statusMessage.dataset.tone = tone;
-    } else {
-        delete statusMessage.dataset.tone;
-    }
-}
-
-function updateLaunchButtonState({ allMet, missing }) {
+function setLaunchButtonState(allMet) {
     if (!launchButton) {
         return;
     }
 
+    if (!defaultLaunchLabel) {
+        defaultLaunchLabel = launchButton.textContent?.trim() ?? 'Launch Unity Voice Lab';
+    }
+
     launchButton.disabled = false;
     launchButton.setAttribute('aria-disabled', 'false');
-    launchButton.dataset.state = allMet ? 'ready' : 'warn';
 
-    if (missing.length > 0) {
-        const summary = formatDependencyList(missing);
-        launchButton.title = `Launch anyway with limited support: ${summary}`;
-    } else {
-        launchButton.removeAttribute('title');
+
+    if (allMet) {
+        allowLaunchOverride = false;
+        launchButton.textContent = defaultLaunchLabel;
+        launchButton.dataset.launchOverride = 'clear';
+        return;
     }
+
+    launchButton.dataset.launchOverride = allowLaunchOverride ? 'ready' : 'required';
+    launchButton.textContent = allowLaunchOverride ? 'Launch anyway' : defaultLaunchLabel;
 }
 
 function evaluateDependencies({ announce = false } = {}) {
@@ -112,21 +92,7 @@ function evaluateDependencies({ announce = false } = {}) {
     updateDependencyUI(results, allMet, { announce, missing });
     updateLaunchButtonState({ allMet, missing });
 
-    if (announce) {
-        if (allMet) {
-            setStatusMessage('All systems look good. Launching Unity Voice Lab…', 'success');
-        } else {
-            const summary = formatDependencyList(missing);
-            setStatusMessage(
-                summary
-                    ? `Launching in compatibility mode. Some features may be limited: ${summary}.`
-                    : 'Launching in compatibility mode. Some browser features may be limited.',
-                'warning'
-            );
-        }
-    } else if (allMet && statusMessage?.textContent) {
-        setStatusMessage('');
-    }
+    setLaunchButtonState(allMet);
 
     return { results, allMet, missing };
 }
@@ -197,10 +163,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
-        const delay = allMet ? 120 : 360;
-        window.setTimeout(() => {
-            redirectToExperience();
-        }, delay);
+        if (!allMet && !allowLaunchOverride) {
+            allowLaunchOverride = true;
+            setLaunchButtonState(false);
+
+            if (statusMessage) {
+                const advisory =
+                    'Some requirements are still missing. Select “Launch anyway” to continue with limited functionality.';
+                statusMessage.textContent = statusMessage.textContent
+                    ? `${statusMessage.textContent} ${advisory}`
+                    : advisory;
+            }
+            return;
+        }
+
+        redirectToExperience();
     });
 
     recheckButton?.addEventListener('click', () => {

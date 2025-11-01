@@ -19,6 +19,17 @@ const dependencyList = document.getElementById('dependency-list');
 const launchButton = document.getElementById('launch-app');
 const recheckButton = document.getElementById('recheck-dependencies');
 const statusMessage = document.getElementById('status-message');
+const redirectToLandingWithStatus = () => {
+    const landingUrl = new URL(window.location.href);
+    landingUrl.search = '';
+    landingUrl.hash = '';
+    landingUrl.pathname = landingUrl.pathname.replace(/AI\/?(?:index\.html)?$/i, '');
+    if (!landingUrl.pathname.endsWith('/')) {
+        landingUrl.pathname = `${landingUrl.pathname}/`;
+    }
+    landingUrl.searchParams.set('missing', '1');
+    window.location.replace(landingUrl.toString());
+};
 
 if (heroImage) {
     heroImage.setAttribute('crossorigin', 'anonymous');
@@ -45,6 +56,8 @@ let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
 let appStarted = false;
+let allowLaunchOverride = false;
+let defaultLaunchLabel = '';
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
 let compatibilityBanner = null;
@@ -196,11 +209,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
-        const delay = allMet ? 120 : 360;
-        window.setTimeout(() => {
-            const targetUrl = new URL('./AI/', window.location.href);
-            window.location.assign(targetUrl.toString());
-        }, delay);
+        if (!allMet && !allowLaunchOverride) {
+            allowLaunchOverride = true;
+            setLaunchButtonState(false);
+
+            if (statusMessage) {
+                const advisory =
+                    'Some requirements are still missing. Select “Launch anyway” to continue with limited functionality.';
+                statusMessage.textContent = statusMessage.textContent
+                    ? `${statusMessage.textContent} ${advisory}`
+                    : advisory;
+            }
+            return;
+        }
+
+        const targetUrl = new URL('./AI/', window.location.href);
+        window.location.assign(targetUrl.toString());
     });
 
     recheckButton?.addEventListener('click', () => {
@@ -213,6 +237,29 @@ window.addEventListener('focus', () => {
         evaluateDependencies();
     }
 });
+
+function setLaunchButtonState(allMet) {
+    if (!launchButton) {
+        return;
+    }
+
+    if (!defaultLaunchLabel) {
+        defaultLaunchLabel = launchButton.textContent?.trim() ?? 'Launch Unity Voice Lab';
+    }
+
+    launchButton.disabled = false;
+    launchButton.setAttribute('aria-disabled', 'false');
+
+    if (allMet) {
+        allowLaunchOverride = false;
+        launchButton.textContent = defaultLaunchLabel;
+        launchButton.dataset.launchOverride = 'clear';
+        return;
+    }
+
+    launchButton.dataset.launchOverride = allowLaunchOverride ? 'ready' : 'required';
+    launchButton.textContent = allowLaunchOverride ? 'Launch anyway' : defaultLaunchLabel;
+}
 
 function evaluateDependencies({ announce = false } = {}) {
     const results = dependencyChecks.map((descriptor) => {
@@ -237,21 +284,7 @@ function evaluateDependencies({ announce = false } = {}) {
     updateDependencyUI(results, allMet, { announce, missing });
     updateLaunchButtonState({ allMet, missing });
 
-    if (appStarted) {
-        if (missing.length > 0) {
-            const banner = ensureCompatibilityBanner();
-            const summary = formatDependencyList(missing);
-            if (banner) {
-                banner.textContent = summary
-                    ? `Compatibility mode active. Some features may be limited: ${summary}.`
-                    : 'Compatibility mode active. Some features may be limited.';
-            }
-        } else if (compatibilityBanner) {
-            compatibilityBanner.remove();
-            compatibilityBanner = null;
-        }
-        updateMuteIndicator();
-    }
+    setLaunchButtonState(allMet);
 
     if (announce) {
         if (allMet) {

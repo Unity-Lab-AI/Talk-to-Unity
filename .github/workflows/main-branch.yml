@@ -170,9 +170,7 @@ jobs:
 
   deploy:
     name: Deploy to Pages
-    needs:
-      - build
-      - run-tests
+    needs: run-tests
     runs-on: ubuntu-latest
     environment:
       name: github-pages

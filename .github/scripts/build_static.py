@@ -19,13 +19,16 @@ def copy_static_files(dist: Path) -> list[str]:
             shutil.copy2(file_path, destination)
             copied.append(str(file_path))
 
-    assets_dir = Path("assets")
-    if assets_dir.exists() and assets_dir.is_dir():
-        target_dir = dist / assets_dir.name
+    directories = [Path("assets"), Path("AI")]
+    for directory in directories:
+        if not directory.exists() or not directory.is_dir():
+            continue
+
+        target_dir = dist / directory.name
         if target_dir.exists():
             shutil.rmtree(target_dir)
-        shutil.copytree(assets_dir, target_dir)
-        copied.append(str(assets_dir))
+        shutil.copytree(directory, target_dir)
+        copied.append(str(directory))
     return copied
 
 def main() -> int:
