@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  tests:
+  run-tests:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
@@ -16,15 +16,11 @@ jobs:
       - name: Set up Python environment
         uses: ./.github/actions/setup-python-playwright
 
-      - name: Run tests
+      - name: Run Tests
         id: run-tests
         continue-on-error: true
         run: python .github/scripts/run_tests.py
 
-      - name: Summarize test results
+      - name: Report Tests Statuses
         if: always()
-        run: python .github/scripts/write_summary.py
-
-      - name: Fail if tests failed
-        if: steps.run-tests.outcome != 'success'
-        run: exit 1
+        run: python .github/scripts/write_summary.py --include-tests

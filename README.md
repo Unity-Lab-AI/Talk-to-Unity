@@ -1,5 +1,8 @@
 # Talk to Unity
 
+![Pull Request Workflow](https://github.com/Unity-Lab-AI/Talk-to-Unity/actions/workflows/pull-request.yml/badge.svg)
+![Main Branch Workflow](https://github.com/Unity-Lab-AI/Talk-to-Unity/actions/workflows/main-branch.yml/badge.svg)
+
 Talk to Unity is a browser-based voice companion that connects visitors with the Unity AI Lab experience. The project ships as a static site, so it can be hosted on GitHub Pages or any web server that can serve HTML, CSS, and JavaScript.
 
 ## What you get
