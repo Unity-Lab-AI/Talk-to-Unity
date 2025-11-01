@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import pytest
 from playwright.sync_api import sync_playwright
 
 
-SITE_URL = "http://www.unityailab.com/Talk-to-Unity/"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SITE_URL = REPO_ROOT.joinpath("AI", "index.html").resolve().as_uri()
 
 
 STUB_SCRIPT = """
@@ -159,7 +162,7 @@ def loaded_page():
         context = browser.new_context(ignore_https_errors=True)
         page = context.new_page()
         page.add_init_script(STUB_SCRIPT)
-        page.goto(SITE_URL, wait_until="domcontentloaded")
+        page.goto(SITE_URL, wait_until="load")
         page.wait_for_selector("#mute-indicator")
         yield page
         context.close()

@@ -18,17 +18,7 @@ const dependencySummary = document.getElementById('dependency-summary');
 const dependencyList = document.getElementById('dependency-list');
 const launchButton = document.getElementById('launch-app');
 const recheckButton = document.getElementById('recheck-dependencies');
-const redirectToLandingWithStatus = () => {
-    const landingUrl = new URL(window.location.href);
-    landingUrl.search = '';
-    landingUrl.hash = '';
-    landingUrl.pathname = landingUrl.pathname.replace(/AI\/?(?:index\.html)?$/i, '');
-    if (!landingUrl.pathname.endsWith('/')) {
-        landingUrl.pathname = `${landingUrl.pathname}/`;
-    }
-    landingUrl.searchParams.set('missing', '1');
-    window.location.replace(landingUrl.toString());
-};
+const statusMessage = document.getElementById('status-message');
 
 if (heroImage) {
     heroImage.setAttribute('crossorigin', 'anonymous');
@@ -56,7 +46,9 @@ let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
 let appStarted = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const synth = window.speechSynthesis;
+const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
+let compatibilityBanner = null;
+let dependencyState = { results: [], allMet: false, missing: [] };
 
 const dependencyChecks = [
     {
@@ -86,6 +78,75 @@ const dependencyChecks = [
         check: () => Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
     }
 ];
+
+function formatDependencyList(items) {
+    const labels = items
+        .map((item) => item.friendlyName ?? item.label ?? item.id)
+        .filter(Boolean);
+
+    if (labels.length === 0) {
+        return '';
+    }
+
+    if (labels.length === 1) {
+        return labels[0];
+    }
+
+    const head = labels.slice(0, -1).join(', ');
+    const tail = labels[labels.length - 1];
+    return `${head} and ${tail}`;
+}
+
+function setStatusMessage(message, tone = 'info') {
+    if (!statusMessage) {
+        return;
+    }
+
+    statusMessage.textContent = message;
+    if (message) {
+        statusMessage.dataset.tone = tone;
+    } else {
+        delete statusMessage.dataset.tone;
+    }
+}
+
+function updateLaunchButtonState({ allMet, missing }) {
+    if (!launchButton) {
+        return;
+    }
+
+    launchButton.disabled = false;
+    launchButton.setAttribute('aria-disabled', 'false');
+    launchButton.dataset.state = allMet ? 'ready' : 'warn';
+
+    if (missing.length > 0) {
+        const summary = formatDependencyList(missing);
+        launchButton.title = `Launch anyway with limited support: ${summary}`;
+    } else {
+        launchButton.removeAttribute('title');
+    }
+}
+
+function ensureCompatibilityBanner() {
+    if (compatibilityBanner) {
+        return compatibilityBanner;
+    }
+
+    const banner = document.createElement('div');
+    banner.className = 'compatibility-notice';
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'polite');
+
+    const statusBanner = appRoot?.querySelector('.status-banner');
+    if (statusBanner) {
+        statusBanner.append(banner);
+    } else if (appRoot) {
+        appRoot.prepend(banner);
+    }
+
+    compatibilityBanner = banner;
+    return compatibilityBanner;
+}
 
 if (heroStage && !heroStage.dataset.state) {
     heroStage.dataset.state = 'empty';
@@ -126,25 +187,20 @@ function resolveAssetPath(relativePath) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const evaluation = evaluateDependencies();
+    const evaluation = evaluateDependencies({ announce: isExperienceRoute });
 
     if (isExperienceRoute) {
-        if (evaluation.allMet) {
-            startApplication();
-        } else {
-            redirectToLandingWithStatus();
-        }
+        startApplication();
         return;
     }
 
     launchButton?.addEventListener('click', () => {
         const { allMet } = evaluateDependencies({ announce: true });
-        if (!allMet) {
-            return;
-        }
-
-        const targetUrl = new URL('./AI/', window.location.href);
-        window.location.assign(targetUrl.toString());
+        const delay = allMet ? 120 : 360;
+        window.setTimeout(() => {
+            const targetUrl = new URL('./AI/', window.location.href);
+            window.location.assign(targetUrl.toString());
+        }, delay);
     });
 
     recheckButton?.addEventListener('click', () => {
@@ -173,18 +229,49 @@ function evaluateDependencies({ announce = false } = {}) {
         };
     });
 
-    const allMet = results.every((result) => result.met);
-    updateDependencyUI(results, allMet, { announce });
+    const missing = results.filter((result) => !result.met);
+    const allMet = missing.length === 0;
 
-    if (launchButton) {
-        launchButton.disabled = !allMet;
-        launchButton.setAttribute('aria-disabled', String(!allMet));
+    dependencyState = { results, allMet, missing };
+
+    updateDependencyUI(results, allMet, { announce, missing });
+    updateLaunchButtonState({ allMet, missing });
+
+    if (appStarted) {
+        if (missing.length > 0) {
+            const banner = ensureCompatibilityBanner();
+            const summary = formatDependencyList(missing);
+            if (banner) {
+                banner.textContent = summary
+                    ? `Compatibility mode active. Some features may be limited: ${summary}.`
+                    : 'Compatibility mode active. Some features may be limited.';
+            }
+        } else if (compatibilityBanner) {
+            compatibilityBanner.remove();
+            compatibilityBanner = null;
+        }
+        updateMuteIndicator();
     }
 
-    return { results, allMet };
+    if (announce) {
+        if (allMet) {
+            setStatusMessage('All systems look good. Launching Unity Voice Lab…', 'success');
+        } else {
+            const summary = formatDependencyList(missing);
+            const message = summary
+                ? `Launching in compatibility mode. Some features may be limited: ${summary}.`
+                : 'Launching in compatibility mode. Some browser features may be limited.';
+            setStatusMessage(message, 'warning');
+            speak(message);
+        }
+    } else if (allMet && statusMessage?.textContent) {
+        setStatusMessage('');
+    }
+
+    return { results, allMet, missing };
 }
 
-function updateDependencyUI(results, allMet, { announce = false } = {}) {
+function updateDependencyUI(results, allMet, { announce = false, missing = [] } = {}) {
     if (dependencyList) {
         results.forEach((result) => {
             const item = dependencyList.querySelector(`[data-dependency="${result.id}"]`);
@@ -192,43 +279,41 @@ function updateDependencyUI(results, allMet, { announce = false } = {}) {
                 return;
             }
 
-            item.dataset.state = result.met ? 'pass' : 'fail';
+            item.dataset.state = result.met ? 'pass' : 'warn';
             const statusElement = item.querySelector('.dependency-status');
             if (statusElement) {
-                statusElement.textContent = result.met ? 'Ready' : 'Action required';
+                statusElement.textContent = result.met ? 'Ready' : 'Check settings';
             }
         });
     }
 
     if (dependencyLight) {
-        dependencyLight.dataset.state = allMet ? 'pass' : 'fail';
+        dependencyLight.dataset.state = allMet ? 'pass' : 'warn';
+        const summary = formatDependencyList(missing);
         dependencyLight.setAttribute(
             'aria-label',
-            allMet ? 'All dependencies satisfied' : 'One or more dependencies are missing'
+            allMet
+                ? 'All dependencies satisfied'
+                : summary
+                ? `Compatibility mode enabled because ${summary} is unavailable`
+                : 'Compatibility mode enabled. Some requirements are missing'
         );
     }
 
     if (dependencySummary) {
-        const unmet = results.filter((result) => !result.met);
-        if (unmet.length === 0) {
+        if (missing.length === 0) {
             dependencySummary.textContent =
                 'All the lights are green! Press "Launch Unity Voice Lab" to start chatting.';
         } else {
-            const firstMissing = unmet[0];
-            const friendlyName = firstMissing?.friendlyName ?? firstMissing?.label ?? 'missing light';
-            dependencySummary.textContent = `The ${friendlyName} is still red. Follow the tip below, then press "Check again."`;
+            const summary = formatDependencyList(missing);
+            dependencySummary.textContent = summary
+                ? `We spotted a few red lights (${summary}). Unity will still launch, but those features may be limited until they turn green.`
+                : 'We spotted a few red lights. Unity will still launch, but some features may be limited.';
         }
     }
 
-    if (announce && !allMet) {
-        const missingNames = results
-            .filter((result) => !result.met)
-            .map((result) => result.friendlyName ?? result.label)
-            .join(', ');
-
-        if (missingNames) {
-            speak(`Missing dependencies: ${missingNames}`);
-        }
+    if (!announce && !allMet) {
+        setStatusMessage('');
     }
 }
 
@@ -245,6 +330,18 @@ async function startApplication() {
 
     if (bodyElement) {
         bodyElement.dataset.appState = 'experience';
+    }
+
+    const missing = dependencyState?.missing ?? [];
+    if (missing.length > 0) {
+        const banner = ensureCompatibilityBanner();
+        const summary = formatDependencyList(missing);
+        if (banner) {
+            banner.textContent = summary
+                ? `Compatibility mode active. Some features may be limited: ${summary}.`
+                : 'Compatibility mode active. Some features may be limited.';
+        }
+        setStatusMessage('');
     }
 
     if (landingSection) {
@@ -438,12 +535,16 @@ async function loadSystemPrompt() {
 
 function setupSpeechRecognition() {
     if (!SpeechRecognition) {
-        console.error('Speech recognition is not supported in this browser.');
-        alert('Speech recognition is not supported in this browser.');
+        console.warn('Speech recognition is not supported in this browser.');
         setCircleState(userCircle, {
             label: 'Speech recognition is not supported in this browser',
             error: true
         });
+        const banner = ensureCompatibilityBanner();
+        if (banner) {
+            banner.textContent = 'Compatibility mode active. Speech recognition is not supported in this browser.';
+        }
+        setStatusMessage('Compatibility mode active. Speech recognition is not supported in this browser.', 'warning');
         return;
     }
 
@@ -558,7 +659,6 @@ async function initializeVoiceControl() {
 
     hasMicPermission = await requestMicPermission();
     if (!hasMicPermission) {
-        alert('Microphone access is required for voice control.');
         updateMuteIndicator();
         return;
     }
@@ -574,11 +674,12 @@ async function initializeVoiceControl() {
 
 async function requestMicPermission() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Microphone access is not supported in this browser.');
+        console.warn('Microphone access is not supported in this browser.');
         setCircleState(userCircle, {
             error: true,
             label: 'Microphone access is not supported in this browser'
         });
+        setStatusMessage('Microphone access is not supported in this browser.', 'warning');
         return false;
     }
 
@@ -595,6 +696,7 @@ async function requestMicPermission() {
             error: true,
             label: 'Microphone permission denied'
         });
+        setStatusMessage('Microphone permission denied. Some voice features will be limited.', 'warning');
         return false;
     }
 }
@@ -607,14 +709,43 @@ function updateMuteIndicator() {
     muteIndicator.classList.add('is-visible');
     muteIndicator.setAttribute('aria-hidden', 'false');
 
+    const missing = dependencyState?.missing ?? [];
+    const recognitionMissing = missing.some((item) => item.id === 'speech-recognition');
+    const microphoneMissing = missing.some((item) => item.id === 'microphone');
+
     if (isMuted) {
-        const message = hasMicPermission
-            ? 'Tap or click anywhere to unmute'
-            : 'Allow microphone access to start';
+        let message;
+
+        if (microphoneMissing) {
+            message = 'Microphone access unavailable. Update your browser permissions to enable voice input.';
+            muteIndicator.dataset.state = 'muted';
+            muteIndicator.setAttribute('aria-label', 'Microphone unavailable. Update permissions to enable listening.');
+        } else if (recognitionMissing) {
+            message = 'Voice recognition unavailable. Continue with on-screen controls.';
+            muteIndicator.dataset.state = 'compat';
+            muteIndicator.setAttribute(
+                'aria-label',
+                'Voice recognition is not supported in this browser. You can still use on-screen controls.'
+            );
+        } else {
+            message = hasMicPermission ? 'Tap or click anywhere to unmute' : 'Allow microphone access to start';
+            muteIndicator.dataset.state = 'muted';
+            muteIndicator.setAttribute('aria-label', 'Microphone muted. Tap to enable listening.');
+        }
+
         indicatorText && (indicatorText.textContent = message);
-        muteIndicator.dataset.state = 'muted';
-        muteIndicator.setAttribute('aria-label', 'Microphone muted. Tap to enable listening.');
     } else {
+        if (recognitionMissing) {
+            indicatorText &&
+                (indicatorText.textContent = 'Voice recognition unavailable. Microphone listening disabled.');
+            muteIndicator.dataset.state = 'compat';
+            muteIndicator.setAttribute(
+                'aria-label',
+                'Voice recognition unavailable. Microphone listening remains disabled.'
+            );
+            return;
+        }
+
         indicatorText && (indicatorText.textContent = 'Listening… tap to mute');
         muteIndicator.dataset.state = 'listening';
         muteIndicator.setAttribute('aria-label', 'Microphone active. Tap to mute.');
@@ -1072,7 +1203,9 @@ async function executeAiCommand(command) {
             return true;
         case 'stop_speaking':
         case 'shutup':
-            synth.cancel();
+            if (synth && typeof synth.cancel === 'function') {
+                synth.cancel();
+            }
             setCircleState(aiCircle, {
                 speaking: false,
                 label: 'Unity is idle'
@@ -1115,6 +1248,11 @@ async function executeAiCommand(command) {
 }
 
 function speak(text) {
+    if (!synth || typeof synth.speak !== 'function') {
+        console.warn('Speech synthesis is not available in this browser.');
+        return;
+    }
+
     if (synth.speaking) {
         synth.cancel();
         setCircleState(aiCircle, {
@@ -1130,7 +1268,7 @@ function speak(text) {
     }
 
     const utterance = new SpeechSynthesisUtterance(sanitizedText);
-    const voices = synth.getVoices();
+    const voices = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
     const ukFemaleVoice = voices.find((voice) =>
         voice.name.includes('Google UK English Female') || (voice.lang === 'en-GB' && voice.gender === 'female')
     );
@@ -1184,7 +1322,9 @@ function handleVoiceCommand(command) {
     }
 
     if (lowerCaseCommand.includes('shut up') || lowerCaseCommand.includes('be quiet')) {
-        synth.cancel();
+        if (synth && typeof synth.cancel === 'function') {
+            synth.cancel();
+        }
         setCircleState(aiCircle, {
             speaking: false,
             label: 'Unity is idle'

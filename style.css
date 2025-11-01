@@ -1,28 +1,36 @@
 :root,
 :root[data-theme='dark'] {
     color-scheme: dark;
-    --border-color: rgba(255, 99, 99, 0.32);
-    --text-color: #fff5f5;
-    --muted-text: rgba(255, 235, 235, 0.85);
-    --surface-bg: rgba(45, 3, 8, 0.85);
-    --surface-border: rgba(255, 99, 99, 0.4);
+    --border-color: rgba(255, 62, 62, 0.28);
+    --text-color: #e6e8ec;
+    --muted-text: rgba(214, 214, 214, 0.78);
+    --surface-bg: rgba(18, 18, 18, 0.92);
+    --surface-border: rgba(255, 62, 62, 0.22);
+    --surface-highlight: rgba(26, 26, 26, 0.9);
     --accent-red: #ff3e3e;
-    --accent-red-soft: rgba(255, 62, 62, 0.7);
+    --accent-red-soft: rgba(255, 62, 62, 0.6);
     --accent-amber: #ff7a3e;
     --accent-green: #34d399;
+    --glow-primary: rgba(255, 62, 62, 0.2);
+    --glow-secondary: rgba(255, 122, 62, 0.16);
+    --compat-warning: rgba(255, 174, 0, 0.18);
 }
 
 body[data-theme='light'] {
     color-scheme: light;
-    --border-color: rgba(55, 55, 65, 0.24);
-    --text-color: #0f141f;
-    --muted-text: rgba(30, 36, 48, 0.72);
-    --surface-bg: rgba(255, 245, 245, 0.92);
-    --surface-border: rgba(255, 133, 133, 0.45);
+    --border-color: rgba(33, 33, 33, 0.12);
+    --text-color: #111318;
+    --muted-text: rgba(38, 38, 38, 0.68);
+    --surface-bg: rgba(255, 255, 255, 0.95);
+    --surface-border: rgba(255, 62, 62, 0.15);
+    --surface-highlight: rgba(255, 250, 250, 0.92);
     --accent-red: #d62828;
-    --accent-red-soft: rgba(214, 40, 40, 0.75);
+    --accent-red-soft: rgba(214, 40, 40, 0.55);
     --accent-amber: #f77f00;
     --accent-green: #2a9d8f;
+    --glow-primary: rgba(214, 40, 40, 0.25);
+    --glow-secondary: rgba(247, 127, 0, 0.2);
+    --compat-warning: rgba(255, 159, 28, 0.22);
 }
 
 * {
@@ -40,7 +48,7 @@ body {
     justify-content: flex-start;
     width: 100%;
     position: relative;
-    background: linear-gradient(160deg, #050505 0%, #120005 55%, #080808 100%);
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 45%, #050505 100%);
     padding: clamp(24px, 6vh, 48px) clamp(16px, 5vw, 56px);
     gap: clamp(24px, 6vh, 56px);
 }
@@ -50,10 +58,10 @@ body::after {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(circle at 20% 20%, rgba(255, 62, 62, 0.18), transparent 55%),
-        radial-gradient(circle at 80% 0%, rgba(255, 180, 120, 0.12), transparent 60%);
+    background: radial-gradient(circle at 20% 20%, var(--glow-primary), transparent 55%),
+        radial-gradient(circle at 80% 0%, var(--glow-secondary), transparent 60%);
     z-index: 0;
-    opacity: 0.95;
+    opacity: 0.9;
 }
 
 body > * {
@@ -91,7 +99,7 @@ body[data-app-state='experience'] #app-root[hidden] {
 
 .landing {
     width: min(1080px, 100%);
-    background: var(--surface-bg);
+    background: var(--surface-highlight);
     border: 1px solid var(--surface-border);
     border-radius: clamp(24px, 4vw, 42px);
     padding: clamp(32px, 6vw, 64px);
@@ -99,7 +107,7 @@ body[data-app-state='experience'] #app-root[hidden] {
     flex-direction: column;
     gap: clamp(32px, 6vh, 56px);
     backdrop-filter: blur(22px) saturate(130%);
-    box-shadow: 0 28px 80px rgba(214, 40, 40, 0.28);
+    box-shadow: 0 32px 90px rgba(255, 62, 62, 0.18);
 }
 
 .landing-hero {
@@ -112,11 +120,11 @@ body[data-app-state='experience'] #app-root[hidden] {
     align-self: flex-start;
     padding: 8px 16px;
     border-radius: 999px;
-    background: rgba(255, 62, 62, 0.18);
-    color: rgba(255, 205, 205, 0.95);
+    background: rgba(255, 62, 62, 0.15);
+    color: rgba(255, 225, 225, 0.92);
     font-size: 0.85rem;
-    border: 1px solid rgba(255, 120, 120, 0.5);
-    box-shadow: inset 0 1px 0 rgba(255, 120, 120, 0.35);
+    border: 1px solid rgba(255, 120, 120, 0.4);
+    box-shadow: inset 0 1px 0 rgba(255, 120, 120, 0.3);
 }
 
 .landing h1 {
@@ -130,7 +138,7 @@ body[data-app-state='experience'] #app-root[hidden] {
 
 .landing-lede {
     margin: 0;
-    color: rgba(255, 225, 225, 0.88);
+    color: var(--muted-text);
     font-size: clamp(1rem, 2.1vw, 1.2rem);
     line-height: 1.7;
 }
@@ -145,13 +153,13 @@ body[data-app-state='experience'] #app-root[hidden] {
     align-self: flex-start;
     padding: 12px 18px;
     border-radius: 12px;
-    border: 1px solid rgba(255, 120, 120, 0.45);
-    color: rgba(255, 210, 210, 0.92);
+    border: 1px solid rgba(255, 120, 120, 0.35);
+    color: rgba(255, 220, 220, 0.88);
     text-decoration: none;
     font-weight: 600;
     transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-    background: linear-gradient(135deg, rgba(255, 62, 62, 0.22), rgba(0, 0, 0, 0.65));
-    box-shadow: inset 0 1px 0 rgba(255, 120, 120, 0.3);
+    background: linear-gradient(135deg, rgba(255, 62, 62, 0.22), rgba(32, 32, 32, 0.8));
+    box-shadow: inset 0 1px 0 rgba(255, 120, 120, 0.28);
 }
 
 .landing-link:hover,
@@ -173,8 +181,8 @@ body[data-app-state='experience'] #app-root[hidden] {
     margin: 0;
     padding: 16px 20px;
     border-radius: 16px;
-    border: 1px solid rgba(255, 120, 120, 0.35);
-    background: rgba(120, 0, 0, 0.3);
+    border: 1px solid rgba(255, 120, 120, 0.32);
+    background: rgba(64, 10, 10, 0.45);
     color: rgba(255, 230, 230, 0.92);
     font-size: 0.95rem;
     line-height: 1.6;
@@ -182,6 +190,18 @@ body[data-app-state='experience'] #app-root[hidden] {
 
 .landing-status:empty {
     display: none;
+}
+
+.landing-status[data-tone='warning'] {
+    border-color: rgba(255, 180, 0, 0.45);
+    background: rgba(128, 64, 0, 0.35);
+    color: #ffe2b8;
+}
+
+.landing-status[data-tone='success'] {
+    border-color: rgba(52, 211, 153, 0.45);
+    background: rgba(12, 94, 74, 0.35);
+    color: #d1ffe9;
 }
 
 .dependency-summary {
@@ -207,9 +227,10 @@ body[data-app-state='experience'] #app-root[hidden] {
     color: rgba(255, 225, 225, 0.86);
 }
 
+
 .landing-instructions h2 {
     margin: 0;
-    color: rgba(255, 210, 210, 0.95);
+    color: rgba(255, 220, 220, 0.92);
     font-size: clamp(1.35rem, 2.4vw, 1.65rem);
 }
 
@@ -223,6 +244,7 @@ body[data-app-state='experience'] #app-root[hidden] {
 
 .landing-steps li {
     line-height: 1.6;
+    color: var(--muted-text);
 }
 
 .landing-steps code {
@@ -232,12 +254,12 @@ body[data-app-state='experience'] #app-root[hidden] {
 .dependency-summary h2 {
     margin: 0 0 6px;
     font-size: clamp(1.2rem, 2vw, 1.45rem);
-    color: rgba(255, 220, 220, 0.95);
+    color: rgba(255, 225, 225, 0.94);
 }
 
 .dependency-summary p {
     margin: 0;
-    color: rgba(255, 225, 225, 0.78);
+    color: rgba(255, 225, 225, 0.82);
     line-height: 1.6;
 }
 
@@ -287,14 +309,14 @@ body[data-app-state='experience'] #app-root[hidden] {
     box-shadow: 0 0 0 2px rgba(26, 10, 0, 0.5), 0 12px 30px rgba(244, 114, 22, 0.32);
 }
 
-.dependency-light[data-state='fail'] {
-    background: linear-gradient(135deg, var(--accent-red), #7f1d1d);
-    box-shadow: 0 0 0 2px rgba(26, 0, 0, 0.55), 0 12px 30px rgba(255, 62, 62, 0.42);
+.dependency-light[data-state='warn'] {
+    background: linear-gradient(135deg, var(--accent-amber), #b45309);
+    box-shadow: 0 0 0 2px rgba(26, 10, 0, 0.55), 0 12px 30px rgba(244, 114, 22, 0.36);
 }
 
-.dependency-item[data-state='fail'] .dependency-name::before {
-    background: linear-gradient(135deg, var(--accent-red), #7f1d1d);
-    box-shadow: 0 0 0 2px rgba(26, 0, 0, 0.55), 0 8px 22px rgba(255, 62, 62, 0.32);
+.dependency-item[data-state='warn'] .dependency-name::before {
+    background: linear-gradient(135deg, var(--accent-amber), #b45309);
+    box-shadow: 0 0 0 2px rgba(26, 10, 0, 0.55), 0 8px 22px rgba(244, 114, 22, 0.28);
 }
 
 .dependency-light[data-state='pass'] {
@@ -320,14 +342,14 @@ body[data-app-state='experience'] #app-root[hidden] {
     border: 1px solid rgba(255, 120, 120, 0.35);
     border-radius: 18px;
     padding: clamp(18px, 3vw, 28px);
-    background: rgba(30, 0, 4, 0.72);
+    background: rgba(24, 8, 12, 0.75);
     box-shadow: inset 0 1px 0 rgba(255, 120, 120, 0.18);
     transition: border-color 0.3s ease, background 0.3s ease;
 }
 
-.dependency-item[data-state='fail'] {
-    border-color: rgba(255, 120, 120, 0.7);
-    background: rgba(64, 4, 12, 0.9);
+.dependency-item[data-state='warn'] {
+    border-color: rgba(255, 180, 0, 0.55);
+    background: rgba(64, 32, 4, 0.8);
 }
 
 .dependency-item[data-state='pass'] {
@@ -389,10 +411,16 @@ button {
 }
 
 button.primary {
-    background: linear-gradient(135deg, var(--accent-red), var(--accent-amber));
+    background: linear-gradient(135deg, rgba(255, 62, 62, 0.95), rgba(255, 90, 32, 0.95));
     color: #0f0f0f;
     font-weight: 600;
     box-shadow: 0 14px 35px rgba(255, 62, 62, 0.35);
+}
+
+button.primary[data-state='warn'] {
+    background: linear-gradient(135deg, rgba(255, 174, 0, 0.95), rgba(255, 94, 0, 0.88));
+    color: #111318;
+    box-shadow: 0 14px 35px rgba(255, 174, 0, 0.35);
 }
 
 button.primary:disabled {
@@ -407,6 +435,11 @@ button.primary:not(:disabled):focus-visible {
     transform: translateY(-2px);
     box-shadow: 0 20px 44px rgba(255, 62, 62, 0.45);
     outline: none;
+}
+
+button.primary[data-state='warn']:hover,
+button.primary[data-state='warn']:focus-visible {
+    box-shadow: 0 20px 44px rgba(255, 174, 0, 0.45);
 }
 
 button.ghost {
@@ -523,6 +556,24 @@ body.no-js #hero-stage::before {
     justify-content: center;
     align-items: center;
     align-self: stretch;
+}
+
+.compatibility-notice {
+    margin-top: 12px;
+    padding: 12px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 174, 0, 0.4);
+    background: var(--compat-warning);
+    color: #ffe7c2;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    text-align: center;
+    max-width: min(520px, 100%);
+    box-shadow: 0 18px 34px rgba(255, 174, 0, 0.18);
+}
+
+body[data-theme='light'] .compatibility-notice {
+    color: #5f3701;
 }
 
 .no-js-banner {
@@ -663,6 +714,16 @@ body.no-js .mute-indicator {
 .mute-indicator[data-state="listening"] {
     border-color: rgba(67, 217, 189, 0.5);
     color: var(--text-color);
+}
+
+.mute-indicator[data-state="compat"] {
+    border-color: rgba(255, 174, 0, 0.5);
+    background: rgba(64, 32, 4, 0.45);
+    color: #ffe7c2;
+}
+
+:root[data-theme='light'] .mute-indicator[data-state="compat"] {
+    color: #5f3701;
 }
 
 .sr-only {
