@@ -3,6 +3,7 @@ const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
+const rootElement = document.documentElement;
 
 let currentImageModel = 'flux';
 let chatHistory = [];
@@ -12,6 +13,11 @@ let isMuted = true;
 let hasMicPermission = false;
 let currentBackgroundUrl = '';
 let pendingBackgroundUrl = '';
+let currentTheme = (rootElement?.dataset?.theme || 'dark').toLowerCase();
+
+if (rootElement) {
+    rootElement.dataset.theme = currentTheme;
+}
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
@@ -321,22 +327,266 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+function setTheme(theme) {
+    if (!rootElement) {
+        return;
+    }
+
+    const normalized = theme === 'light' ? 'light' : 'dark';
+
+    if (currentTheme === normalized) {
+        return;
+    }
+
+    currentTheme = normalized;
+    rootElement.dataset.theme = normalized;
+}
+
+function detectCommandKey(phrase = '') {
+    const normalized = phrase.toLowerCase();
+
+    if (!normalized) {
+        return null;
+    }
+
+    if (/\bmute(?:\s+(?:my|the))?\s+(?:mic|microphone)\b/.test(normalized) || normalized.includes('mute me')) {
+        return 'MUTE_MIC';
+    }
+
+    if (
+        /\bunmute(?:\s+(?:my|the))?\s+(?:mic|microphone)\b/.test(normalized) ||
+        normalized.includes('turn the mic back on') ||
+        /\bunmute\b/.test(normalized)
+    ) {
+        return 'UNMUTE_MIC';
+    }
+
+    if (
+        normalized.includes('shut up') ||
+        normalized.includes('be quiet') ||
+        normalized.includes('stop talking') ||
+        normalized.includes('stop speaking')
+    ) {
+        return 'STOP_SPEECH';
+    }
+
+    if (
+        normalized.includes('copy image') ||
+        normalized.includes('copy this image') ||
+        normalized.includes('copy the image')
+    ) {
+        return 'COPY_IMAGE';
+    }
+
+    if (
+        normalized.includes('save image') ||
+        normalized.includes('download image') ||
+        normalized.includes('save this image')
+    ) {
+        return 'SAVE_IMAGE';
+    }
+
+    if (
+        normalized.includes('open image') ||
+        normalized.includes('open this image') ||
+        normalized.includes('show image')
+    ) {
+        return 'OPEN_IMAGE';
+    }
+
+    if (
+        normalized.includes('clear history') ||
+        normalized.includes('delete history') ||
+        normalized.includes('clear chat') ||
+        normalized.includes('clear conversation') ||
+        normalized.includes('reset chat') ||
+        normalized.includes('reset conversation')
+    ) {
+        return 'CLEAR_CHAT';
+    }
+
+    if (
+        normalized.includes('light mode') ||
+        normalized.includes('light theme') ||
+        normalized.includes('change to light') ||
+        normalized.includes('switch to light')
+    ) {
+        return 'THEME_LIGHT';
+    }
+
+    if (
+        normalized.includes('dark mode') ||
+        normalized.includes('dark theme') ||
+        normalized.includes('change to dark') ||
+        normalized.includes('switch to dark')
+    ) {
+        return 'THEME_DARK';
+    }
+
+    return null;
+}
+
+function executeCommand(commandKey, { announce = false } = {}) {
+    const key = (commandKey || '').toUpperCase();
+
+    switch (key) {
+        case 'MUTE_MIC': {
+            const wasMuted = isMuted;
+
+            if (!isMuted) {
+                isMuted = true;
+            }
+
+            updateMuteIndicator();
+            setCircleState(userCircle, {
+                listening: false,
+                speaking: false,
+                label: 'Microphone is muted'
+            });
+
+            if (recognition) {
+                recognition.stop();
+            }
+
+            if (announce) {
+                speak(wasMuted ? 'Microphone is already muted.' : 'Microphone muted.');
+            }
+            return true;
+        }
+
+        case 'UNMUTE_MIC': {
+            if (!isMuted) {
+                if (announce) {
+                    speak('Microphone is already unmuted.');
+                }
+                return true;
+            }
+
+            const attempt = attemptUnmute();
+
+            if (attempt?.then) {
+                attempt
+                    .then(() => {
+                        if (!announce) {
+                            return;
+                        }
+
+                        if (!isMuted) {
+                            speak('Microphone unmuted.');
+                        } else {
+                            speak('Unable to unmute the microphone.');
+                        }
+                    })
+                    .catch(() => {
+                        if (announce) {
+                            speak('Unable to unmute the microphone.');
+                        }
+                    });
+                return true;
+            }
+
+            if (announce) {
+                if (!isMuted) {
+                    speak('Microphone unmuted.');
+                } else {
+                    speak('Unable to unmute the microphone.');
+                }
+            }
+
+            return true;
+        }
+
+        case 'STOP_SPEECH': {
+            synth.cancel();
+            setCircleState(aiCircle, {
+                speaking: false,
+                label: 'Unity is idle'
+            });
+            return true;
+        }
+
+        case 'COPY_IMAGE': {
+            copyImageToClipboard(announce);
+            return true;
+        }
+
+        case 'SAVE_IMAGE': {
+            saveImage(announce);
+            return true;
+        }
+
+        case 'OPEN_IMAGE': {
+            openImageInNewTab(announce);
+            return true;
+        }
+
+        case 'CLEAR_CHAT': {
+            chatHistory = [];
+            if (announce) {
+                speak('Chat history cleared.');
+            }
+            return true;
+        }
+
+        case 'THEME_LIGHT': {
+            const previousTheme = currentTheme;
+            setTheme('light');
+            if (announce) {
+                speak(previousTheme === 'light' ? 'Light mode is already on.' : 'Switched to light mode.');
+            }
+            return true;
+        }
+
+        case 'THEME_DARK': {
+            const previousTheme = currentTheme;
+            setTheme('dark');
+            if (announce) {
+                speak(previousTheme === 'dark' ? 'Dark mode is already on.' : 'Switched to dark mode.');
+            }
+            return true;
+        }
+
+        default:
+            return false;
+    }
+}
+
+function extractCommandTags(text = '') {
+    const commandPattern = /\[COMMAND:([A-Z_]+)\]/gi;
+    const matches = [];
+    let match;
+
+    while ((match = commandPattern.exec(text)) !== null) {
+        matches.push(match[1].toUpperCase());
+    }
+
+    return Array.from(new Set(matches));
+}
+
+function stripCommandTags(text = '') {
+    return text.replace(/\[COMMAND:[^\]]+\]/gi, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
 function sanitizeForSpeech(text) {
     if (typeof text !== 'string') {
         return '';
     }
 
-    const withoutUrls = text
-        .replace(/\bhttps?:\/\/\S+/gi, '')
-        .replace(/\bwww\.[^\s]+/gi, '');
+    let sanitized = text;
 
-    return withoutUrls.replace(/\s{2,}/g, ' ').trim();
+    sanitized = sanitized.replace(/\[COMMAND:[^\]]+\]/gi, ' ');
+    sanitized = sanitized.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ');
+    sanitized = sanitized.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/gi, '$1');
+    sanitized = sanitized.replace(/https?:\/\/[^\s)]+/gi, ' ');
+    sanitized = sanitized.replace(/www\.[^\s)]+/gi, ' ');
+    sanitized = sanitized.replace(/\((\s*https?:\/\/[^)\s]+)\s*\)/gi, ' ');
+
+    return sanitized.replace(/\s{2,}/g, ' ').trim();
 }
 
 function speak(text) {
     if (synth.speaking) {
-        console.error('Speech synthesis is already speaking.');
-        return;
+        synth.cancel();
     }
 
     const sanitizedText = sanitizeForSpeech(text);
@@ -373,68 +623,49 @@ function speak(text) {
         });
     };
 
-    synth.speak(utterance);
-}
-
-function handleVoiceCommand(command) {
-    const lowerCaseCommand = command.toLowerCase();
-
-    if (lowerCaseCommand.includes('mute my mic') || lowerCaseCommand.includes('mute microphone')) {
-        isMuted = true;
-        updateMuteIndicator();
-        setCircleState(userCircle, {
-            listening: false,
-            speaking: false,
-            label: 'Microphone is muted'
-        });
-        if (recognition) {
-            recognition.stop();
-        }
-        speak('Microphone muted.');
-        return true;
-    }
-
-    if (lowerCaseCommand.includes('unmute my mic') || lowerCaseCommand.includes('unmute microphone')) {
-        isMuted = false;
-        updateMuteIndicator();
-        setCircleState(userCircle, {
-            listening: true,
-            label: 'Listening for your voice'
-        });
-        if (recognition) {
-            try {
-                recognition.start();
-            } catch (error) {
-                console.error('Failed to start recognition:', error);
-            }
-        }
-        speak('Microphone unmuted.');
-        return true;
-    }
-
-    if (lowerCaseCommand.includes('shut up') || lowerCaseCommand.includes('be quiet')) {
-        synth.cancel();
+    utterance.onerror = () => {
         setCircleState(aiCircle, {
             speaking: false,
             label: 'Unity is idle'
         });
+    };
+
+    synth.speak(utterance);
+}
+
+function handleVoiceCommand(command) {
+    const commandKey = detectCommandKey(command);
+
+    if (!commandKey) {
+        return false;
+    }
+
+    if (commandKey === 'THEME_LIGHT' || commandKey === 'THEME_DARK') {
+        executeCommand(commandKey, { announce: true });
         return true;
     }
 
-    if (lowerCaseCommand.includes('copy image') || lowerCaseCommand.includes('copy this image')) {
-        copyImageToClipboard();
+    if (commandKey === 'STOP_SPEECH') {
+        executeCommand(commandKey, { announce: false });
         return true;
     }
 
-    if (lowerCaseCommand.includes('save image') || lowerCaseCommand.includes('download image')) {
-        saveImage();
+    if (commandKey === 'MUTE_MIC' || commandKey === 'UNMUTE_MIC') {
+        executeCommand(commandKey, { announce: true });
         return true;
     }
 
-    if (lowerCaseCommand.includes('open image') || lowerCaseCommand.includes('open this image')) {
-        openImageInNewTab();
+    if (commandKey === 'CLEAR_CHAT') {
+        executeCommand(commandKey, { announce: true });
         return true;
     }
+
+    if (commandKey === 'COPY_IMAGE' || commandKey === 'SAVE_IMAGE' || commandKey === 'OPEN_IMAGE') {
+        executeCommand(commandKey, { announce: true });
+        return true;
+    }
+
+    const lowerCaseCommand = command.toLowerCase();
 
     if (lowerCaseCommand.includes('use flux model') || lowerCaseCommand.includes('switch to flux')) {
         currentImageModel = 'flux';
@@ -451,16 +682,6 @@ function handleVoiceCommand(command) {
     if (lowerCaseCommand.includes('use kontext model') || lowerCaseCommand.includes('switch to kontext')) {
         currentImageModel = 'kontext';
         speak('Image model set to kontext.');
-        return true;
-    }
-
-    if (
-        lowerCaseCommand.includes('clear history') ||
-        lowerCaseCommand.includes('delete history') ||
-        lowerCaseCommand.includes('clear chat')
-    ) {
-        chatHistory = [];
-        speak('Chat history cleared.');
         return true;
     }
 
@@ -486,6 +707,12 @@ function shouldUseUnityReferrer() {
 
 async function getAIResponse(userInput) {
     console.log(`Sending to AI: ${userInput}`);
+
+    const preCommandKey = detectCommandKey(userInput);
+    if (preCommandKey) {
+        executeCommand(preCommandKey, { announce: true });
+        return;
+    }
 
     chatHistory.push({ role: 'user', content: userInput });
 
@@ -543,7 +770,18 @@ async function getAIResponse(userInput) {
         }
 
         chatHistory.push({ role: 'assistant', content: aiText });
-        speak(aiText);
+
+        const commandTags = extractCommandTags(aiText);
+        if (commandTags.length) {
+            commandTags.forEach((command) => {
+                executeCommand(command, { announce: false });
+            });
+        }
+
+        const cleanedAiText = stripCommandTags(aiText);
+        if (cleanedAiText) {
+            speak(cleanedAiText);
+        }
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
         setCircleState(aiCircle, {
@@ -615,7 +853,7 @@ function updateBackgroundImage(imageUrl) {
     image.src = imageUrl;
 }
 
-async function copyImageToClipboard() {
+async function copyImageToClipboard(announce = true) {
     const imageUrl = getImageUrl();
     if (!imageUrl) {
         return;
@@ -625,14 +863,16 @@ async function copyImageToClipboard() {
         const response = await fetch(imageUrl);
         const blob = await response.blob();
         await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-        speak('Image copied to clipboard.');
+        if (announce) {
+            speak('Image copied to clipboard.');
+        }
     } catch (error) {
         console.error('Failed to copy image: ', error);
         speak('Sorry, I could not copy the image. This might be due to browser limitations.');
     }
 }
 
-async function saveImage() {
+async function saveImage(announce = true) {
     const imageUrl = getImageUrl();
     if (!imageUrl) {
         return;
@@ -650,19 +890,23 @@ async function saveImage() {
         link.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(link);
-        speak('Image saved.');
+        if (announce) {
+            speak('Image saved.');
+        }
     } catch (error) {
         console.error('Failed to save image: ', error);
         speak('Sorry, I could not save the image.');
     }
 }
 
-function openImageInNewTab() {
+function openImageInNewTab(announce = true) {
     const imageUrl = getImageUrl();
     if (!imageUrl) {
         return;
     }
 
     window.open(imageUrl, '_blank');
-    speak('Image opened in new tab.');
+    if (announce) {
+        speak('Image opened in new tab.');
+    }
 }

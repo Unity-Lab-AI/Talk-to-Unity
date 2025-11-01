@@ -6,6 +6,22 @@
     --muted-text: rgba(245, 245, 245, 0.82);
 }
 
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg-color: #0b0b0f;
+    --border-color: rgba(255, 255, 255, 0.18);
+    --text-color: #f5f5f5;
+    --muted-text: rgba(245, 245, 245, 0.82);
+}
+
+:root[data-theme='light'] {
+    color-scheme: light;
+    --bg-color: #f4f6fb;
+    --border-color: rgba(11, 11, 15, 0.14);
+    --text-color: #0b0b0f;
+    --muted-text: rgba(11, 11, 15, 0.68);
+}
+
 * {
     box-sizing: border-box;
 }
@@ -28,7 +44,8 @@ body {
     inset: 0;
     background-size: cover;
     background-position: center;
-    z-index: -2;
+    z-index: -1;
+    pointer-events: none;
 }
 
 .layout {
