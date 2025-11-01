@@ -1,0 +1,180 @@
+name: Main Branch Workflow
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and Upload Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Build static site
+        run: |
+          python .github/scripts/build_static.py
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Prepare build status output
+        id: prepare_build_status
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path('build-results.json').read_text())
+          encoded = base64.b64encode(json.dumps(data).encode()).decode()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"encoded={encoded}\n")
+          PY
+    outputs:
+      status: ${{ steps.prepare_build_status.outputs.encoded }}
+
+  report-build:
+    name: Report Build Status
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Report Build Status
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+
+          encoded = "${{ needs.build.outputs.status }}"
+          if not encoded:
+              report = ["## Build Status", "", "No build status information was captured."]
+          else:
+              data = json.loads(base64.b64decode(encoded).decode())
+              status = data.get('status', 'unknown').lower()
+              emoji = '✅' if status == 'success' else ('⚠️' if status == 'warning' else '❌')
+              details = data.get('message')
+              copied = data.get('copied', [])
+              report = [
+                  "## Build Status",
+                  "",
+                  f"Overall build result: {emoji} {status.title()}",
+              ]
+              if copied:
+                  report.append("")
+                  report.append("### Copied static files")
+                  for item in copied:
+                      report.append(f"- {item}")
+              if details:
+                  report.append("")
+                  report.append(f"Details: {details}")
+
+          summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary_path:
+              with open(summary_path, 'a', encoding='utf-8') as fh:
+                  fh.write("\n".join(report) + "\n")
+          print("\n".join(report))
+          PY
+
+  run-tests:
+    name: Run Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Execute tests sequentially
+        run: |
+          python .github/scripts/run_tests.py
+      - name: Prepare test results output
+        id: prepare_results
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path('test-results.json').read_text())
+          encoded = base64.b64encode(json.dumps(data).encode()).decode()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"encoded={encoded}\n")
+          PY
+    outputs:
+      results: ${{ steps.prepare_results.outputs.encoded }}
+
+  report-tests:
+    name: Report Tests Statuses
+    needs: run-tests
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Report Tests Statuses
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+
+          encoded = "${{ needs.run-tests.outputs.results }}"
+          if not encoded:
+              summary = "No test results were produced."
+              table_lines = []
+          else:
+              data = json.loads(base64.b64decode(encoded).decode())
+              tests = data.get('tests', [])
+              if not tests:
+                  summary = "No tests were discovered under /tests."
+                  table_lines = []
+              else:
+                  summary = f"Processed {len(tests)} test(s)."
+                  table_lines = ["| Test | Status |", "| --- | --- |"]
+                  for item in tests:
+                      status = item.get('status', 'unknown').lower()
+                      emoji = '✅' if status == 'passed' else ('❌' if status == 'failed' else '⚠️')
+                      table_lines.append(f"| {item.get('name', 'unknown')} | {emoji} {status.title()} |")
+
+          report_lines = ["## Main Branch Test Results", "", summary]
+          if table_lines:
+              report_lines.extend(["", *table_lines])
+
+          summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary_path:
+              with open(summary_path, 'a', encoding='utf-8') as fh:
+                  fh.write("\n".join(report_lines) + "\n")
+          print("\n".join(report_lines))
+          PY
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
