@@ -11,7 +11,13 @@
     <script defer src="./app.js"></script>
     <!-- endbuild js -->
 </head>
-<body>
+<body class="no-js">
+    <noscript>
+        <div class="no-js-banner" role="alert">
+            <strong>JavaScript is disabled.</strong>
+            The live Unity assistant requires JavaScript, so the static preview is shown instead.
+        </div>
+    </noscript>
     <div class="app-shell">
         <header class="status-banner" role="status" aria-live="polite">
             <button id="mute-indicator" class="mute-indicator" data-state="muted" type="button">

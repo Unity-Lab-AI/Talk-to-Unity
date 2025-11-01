@@ -5,6 +5,12 @@ const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
 
+const bodyElement = document.body;
+if (bodyElement) {
+    bodyElement.classList.remove('no-js');
+    bodyElement.classList.add('js-enabled');
+}
+
 let currentImageModel = 'flux';
 let chatHistory = [];
 let systemPrompt = '';
