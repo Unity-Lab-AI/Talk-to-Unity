@@ -204,6 +204,10 @@
         const detail = event?.detail ?? {};
         const { allMet = false, missing = [] } = detail;
 
+        if (typeof window !== 'undefined') {
+            window.__talkToUnityLaunchIntent = detail;
+        }
+
         const summary = formatDependencyList(missing);
         const tone = allMet ? 'success' : 'warning';
         const launchMessage = allMet

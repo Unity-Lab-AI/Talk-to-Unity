@@ -119,6 +119,86 @@ window.addEventListener('focus', () => {
     }
 });
 
+function normalizeLaunchResults(detail) {
+    if (!detail || typeof detail !== 'object') {
+        return null;
+    }
+
+    const normalizedResults = Array.isArray(detail.results)
+        ? detail.results
+              .map((item) => {
+                  if (!item || typeof item !== 'object') {
+                      return null;
+                  }
+
+                  const id = typeof item.id === 'string' ? item.id : undefined;
+                  if (!id) {
+                      return null;
+                  }
+
+                  return {
+                      id,
+                      label: item.label || item.friendlyName || id,
+                      met: Boolean(item.met)
+                  };
+              })
+              .filter(Boolean)
+        : null;
+
+    if (!normalizedResults || normalizedResults.length === 0) {
+        return null;
+    }
+
+    const inferredAllMet = normalizedResults.every((result) => result.met);
+    const allMet = typeof detail.allMet === 'boolean' ? detail.allMet : inferredAllMet;
+
+    return {
+        results: normalizedResults,
+        allMet
+    };
+}
+
+async function handleTalkToUnityLaunch(detail) {
+    const normalized = normalizeLaunchResults(detail);
+
+    if (normalized) {
+        updateDependencyUI(normalized.results, normalized.allMet, { announce: false });
+    } else if (!appStarted) {
+        evaluateDependencies();
+    }
+
+    if (appStarted) {
+        if (typeof window !== 'undefined') {
+            delete window.__talkToUnityLaunchIntent;
+        }
+        return;
+    }
+
+    try {
+        await startApplication();
+    } catch (error) {
+        console.error('Failed to start the Talk to Unity experience:', error);
+        appStarted = false;
+        throw error;
+    } finally {
+        if (typeof window !== 'undefined') {
+            delete window.__talkToUnityLaunchIntent;
+        }
+    }
+}
+
+window.addEventListener('talk-to-unity:launch', (event) => {
+    handleTalkToUnityLaunch(event?.detail).catch((error) => {
+        console.error('Error while handling Talk to Unity launch event:', error);
+    });
+});
+
+if (typeof window !== 'undefined' && window.__talkToUnityLaunchIntent) {
+    handleTalkToUnityLaunch(window.__talkToUnityLaunchIntent).catch((error) => {
+        console.error('Failed to honor pending Talk to Unity launch intent:', error);
+    });
+}
+
 function evaluateDependencies({ announce = false } = {}) {
     const results = dependencyChecks.map((descriptor) => {
         let met = false;
