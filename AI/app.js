@@ -34,6 +34,9 @@ let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
 let appStarted = false;
+const SPEECH_RECOGNITION_SUPPRESSION_MS = 400;
+let isAiSpeaking = false;
+let suppressRecognitionUntil = 0;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
@@ -570,7 +573,23 @@ function setupSpeechRecognition() {
     };
 
     recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        const latestResult = event.results[event.results.length - 1]?.[0];
+        const transcript = latestResult?.transcript?.trim() ?? '';
+        const now = Date.now();
+
+        if (isAiSpeaking || now < suppressRecognitionUntil) {
+            if (transcript) {
+                console.log('Ignoring speech recognition result during AI speech:', transcript);
+            } else {
+                console.log('Ignoring speech recognition result during AI speech.');
+            }
+            return;
+        }
+
+        if (!transcript) {
+            return;
+        }
+
         console.log('User said:', transcript);
 
         setCircleState(userCircle, {
@@ -1101,6 +1120,33 @@ function parseAiDirectives(responseText) {
     return { cleanedText, commands: uniqueCommands };
 }
 
+function finalizeSpeechPlayback({ maintainVisuals = false, applySuppression = true } = {}) {
+    isAiSpeaking = false;
+
+    if (applySuppression) {
+        suppressRecognitionUntil = Date.now() + SPEECH_RECOGNITION_SUPPRESSION_MS;
+    }
+
+    if (!maintainVisuals) {
+        setCircleState(aiCircle, {
+            speaking: false,
+            label: 'Unity is idle'
+        });
+    }
+}
+
+function stopSpeechPlayback(options = {}) {
+    if (synth.speaking) {
+        try {
+            synth.cancel();
+        } catch (error) {
+            console.error('Failed to cancel speech synthesis:', error);
+        }
+    }
+
+    finalizeSpeechPlayback(options);
+}
+
 async function executeAiCommand(command, options = {}) {
     if (!command) {
         return false;
@@ -1117,11 +1163,7 @@ async function executeAiCommand(command, options = {}) {
             return true;
         case 'stop_speaking':
         case 'shutup':
-            synth.cancel();
-            setCircleState(aiCircle, {
-                speaking: false,
-                label: 'Unity is idle'
-            });
+            stopSpeechPlayback();
             return true;
         case 'copy_image':
             await copyImageToClipboard(options.imageUrl);
@@ -1161,11 +1203,7 @@ async function executeAiCommand(command, options = {}) {
 
 function speak(text) {
     if (synth.speaking) {
-        synth.cancel();
-        setCircleState(aiCircle, {
-            speaking: false,
-            label: 'Unity is idle'
-        });
+        stopSpeechPlayback({ maintainVisuals: true });
     }
 
     const sanitizedText = sanitizeForSpeech(text);
@@ -1187,6 +1225,7 @@ function speak(text) {
     }
 
     utterance.onstart = () => {
+        isAiSpeaking = true;
         console.log('AI is speaking...');
         setCircleState(aiCircle, {
             speaking: true,
@@ -1196,10 +1235,12 @@ function speak(text) {
 
     utterance.onend = () => {
         console.log('AI finished speaking.');
-        setCircleState(aiCircle, {
-            speaking: false,
-            label: 'Unity is idle'
-        });
+        finalizeSpeechPlayback();
+    };
+
+    utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event.error);
+        finalizeSpeechPlayback();
     };
 
     synth.speak(utterance);
@@ -1229,11 +1270,7 @@ function handleVoiceCommand(command) {
     }
 
     if (lowerCaseCommand.includes('shut up') || lowerCaseCommand.includes('be quiet')) {
-        synth.cancel();
-        setCircleState(aiCircle, {
-            speaking: false,
-            label: 'Unity is idle'
-        });
+        stopSpeechPlayback();
         return true;
     }
 
