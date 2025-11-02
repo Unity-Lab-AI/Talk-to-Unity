@@ -2,7 +2,20 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const root = __dirname;
+const projectRoot = __dirname;
+const candidateRoot = process.env.PLAYWRIGHT_SERVE_DIR
+    ? path.resolve(projectRoot, process.env.PLAYWRIGHT_SERVE_DIR)
+    : '';
+
+const hasCustomRoot = candidateRoot && fs.existsSync(candidateRoot);
+
+if (candidateRoot && !hasCustomRoot) {
+    console.warn(
+        `Requested Playwright serve directory "${candidateRoot}" was not found. Falling back to project root.`
+    );
+}
+
+const root = hasCustomRoot ? candidateRoot : projectRoot;
 const port = process.env.PORT ? Number(process.env.PORT) : 4173;
 
 const MIME_TYPES = {
@@ -72,7 +85,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, () => {
-    console.log(`Static server listening on http://127.0.0.1:${port}`);
+    console.log(`Static server listening on http://127.0.0.1:${port} (serving ${root})`);
 });
 
 function shutdown() {

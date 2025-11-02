@@ -1,6 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { Buffer } from 'buffer';
-
 declare global {
     interface UnityTestHooks {
         getChatHistory(): Array<{ role: string; content: string }>;
@@ -21,6 +19,7 @@ declare global {
         speechSynthesis: {
             speakCalls: string[];
         };
+        __testClipboardWrites?: unknown[];
     }
 }
 
@@ -141,9 +140,19 @@ test.beforeEach(async ({ page, context }) => {
             configurable: true
         });
 
+        const clipboardWrites = [];
+
+        Object.defineProperty(window, '__testClipboardWrites', {
+            value: clipboardWrites,
+            configurable: true,
+            writable: true
+        });
+
         Object.defineProperty(navigator, 'clipboard', {
             value: {
-                write() {
+                writes: clipboardWrites,
+                write(items) {
+                    clipboardWrites.push(items);
                     return Promise.resolve();
                 }
             },
@@ -165,16 +174,196 @@ test.beforeEach(async ({ page, context }) => {
         });
     });
 
-    await page.route('https://image.pollinations.ai/*', async (route) => {
+    await context.unroute('**/image.pollinations.ai/**').catch(() => {});
+    await context.route('**/image.pollinations.ai/**', async (route) => {
         await route.fulfill({
             status: 200,
             headers: {
                 'content-type': 'image/png',
                 'access-control-allow-origin': '*'
             },
-            body: Buffer.from(MOCK_IMAGE_BASE64, 'base64')
+            body: MOCK_IMAGE_BASE64,
+            isBase64: true
         });
     });
+});
+
+test('landing highlights missing dependencies but allows limited launch', async ({ page }) => {
+    await page.addInitScript(() => {
+        Object.defineProperty(window, 'SpeechRecognition', {
+            value: undefined,
+            configurable: true
+        });
+        Object.defineProperty(window, 'webkitSpeechRecognition', {
+            value: undefined,
+            configurable: true
+        });
+        Object.defineProperty(window, 'speechSynthesis', {
+            value: undefined,
+            configurable: true
+        });
+
+        Object.defineProperty(navigator, 'mediaDevices', {
+            value: { getUserMedia: undefined },
+            configurable: true
+        });
+    });
+
+    await page.goto('/index.html');
+
+    await page.evaluate(() => {
+        window.__unityLandingTestHooks?.initialize();
+        window.__unityLandingTestHooks?.evaluateDependencies({ announce: true });
+    });
+
+    await page.waitForFunction(() =>
+        document.querySelector('[data-dependency="speech-recognition"]')?.getAttribute('data-state') === 'fail' &&
+        document.querySelector('[data-dependency="speech-synthesis"]')?.getAttribute('data-state') === 'fail'
+    );
+
+    await expect(page.locator('#dependency-summary')).toContainText(/Alerts/i);
+    await expect(page.locator('[data-dependency="speech-recognition"]')).toHaveAttribute('data-state', 'fail');
+    await expect(page.locator('[data-dependency="speech-synthesis"]')).toHaveAttribute('data-state', 'fail');
+    await expect(page.locator('[data-dependency="microphone"]')).toHaveAttribute('data-state', 'fail');
+
+    const launchButton = page.locator('#launch-app');
+    await expect(launchButton).toBeEnabled();
+    await expect(launchButton).toHaveAttribute('data-state', 'warn');
+    await expect(page.locator('#status-message')).toContainText(/limited/i);
+});
+
+test('ai generates fallback imagery and applies theme commands', async ({ page }) => {
+    await page.goto('/index.html');
+
+    await page.evaluate(() => {
+        window.__unityLandingTestHooks?.initialize();
+        window.__unityLandingTestHooks?.markAllDependenciesReady();
+    });
+
+    const launchButton = page.getByRole('button', { name: 'Talk to Unity' });
+    await expect(launchButton).toBeEnabled();
+
+    await page.goto('/AI/index.html');
+
+    await page.waitForFunction(() => Boolean(window.__unityTestHooks?.isAppReady()));
+
+    await page.unroute('https://text.pollinations.ai/openai');
+
+    const fallbackResponse = {
+        choices: [
+            {
+                message: {
+                    content:
+                        '[command: theme_light]\nLet me paint a tranquil sunrise above misty mountains.'
+                }
+            }
+        ]
+    };
+
+    await page.route('https://text.pollinations.ai/openai', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(fallbackResponse)
+        });
+    });
+
+    const result = await page.evaluate(async () => {
+        const hooks = window.__unityTestHooks;
+        if (!hooks) {
+            throw new Error('Unity test hooks are not available');
+        }
+
+        const response = await hooks.sendUserInput(
+            'Please paint a tranquil sunrise above misty mountains'
+        );
+
+        return {
+            response,
+            theme: document.body.dataset.theme,
+            heroState: document.getElementById('hero-stage')?.dataset.state ?? '',
+            heroUrl: hooks.getCurrentHeroImage(),
+            speakCalls: window.speechSynthesis.speakCalls.slice()
+        };
+    });
+
+    expect(result.response?.commands).toContain('theme_light');
+    expect(result.response?.imageUrl).toContain('image.pollinations.ai');
+    expect(result.theme).toBe('light');
+    expect(['loaded', 'error']).toContain(result.heroState);
+    if (result.heroState === 'loaded') {
+        expect(result.heroUrl).toContain('image.pollinations.ai');
+    }
+    expect(result.speakCalls.some((entry) => /tranquil sunrise/i.test(entry))).toBe(true);
+});
+
+test('ai copies generated imagery when commanded by the assistant', async ({ page }) => {
+    await page.goto('/index.html');
+
+    await page.evaluate(() => {
+        window.__unityLandingTestHooks?.initialize();
+        window.__unityLandingTestHooks?.markAllDependenciesReady();
+    });
+
+    const launchButton = page.getByRole('button', { name: 'Talk to Unity' });
+    await expect(launchButton).toBeEnabled();
+
+    await page.goto('/AI/index.html');
+
+    await page.waitForFunction(() => Boolean(window.__unityTestHooks?.isAppReady()));
+
+    await page.unroute('https://text.pollinations.ai/openai');
+
+    const copyResponse = {
+        choices: [
+            {
+                message: {
+                    content:
+                        '[command: copy_image]\nHere is your vibrant skyline.\nImage URL: https://image.pollinations.ai/prompt/copy-test.png'
+                }
+            }
+        ]
+    };
+
+    await page.route('https://text.pollinations.ai/openai', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(copyResponse)
+        });
+    });
+
+    const result = await page.evaluate(async () => {
+        const hooks = window.__unityTestHooks;
+        if (!hooks) {
+            throw new Error('Unity test hooks are not available');
+        }
+
+        const response = await hooks.sendUserInput(
+            'Generate a futuristic skyline image for me.'
+        );
+
+        const history = hooks.getChatHistory();
+
+        return {
+            response,
+            clipboardWrites: window.__testClipboardWrites?.length ?? 0,
+            heroState: document.getElementById('hero-stage')?.dataset.state ?? '',
+            heroUrl: hooks.getCurrentHeroImage(),
+            lastMessage: history.at(-1) ?? null,
+            speakCalls: window.speechSynthesis.speakCalls.slice()
+        };
+    });
+
+    expect(result.response?.commands).toContain('copy_image');
+    expect(result.response?.imageUrl).toContain('image.pollinations.ai');
+    expect(result.clipboardWrites).toBeGreaterThan(0);
+    expect(['loaded', 'error']).toContain(result.heroState);
+    if (result.heroState === 'loaded') {
+        expect(result.heroUrl).toContain('image.pollinations.ai');
+    }
+    expect(result.lastMessage?.content ?? '').not.toMatch(/command/i);
+    expect(result.speakCalls.some((entry) => /image copied to clipboard/i.test(entry))).toBe(true);
 });
 
 test('user can launch Talk to Unity and receive AI response with image and speech', async ({ page }) => {
@@ -225,10 +414,7 @@ test('user can launch Talk to Unity and receive AI response with image and speec
 
     await expect(launchButton).toBeEnabled();
 
-    await Promise.all([
-        page.waitForNavigation({ url: /\/AI\/index\.html$/i }),
-        launchButton.click()
-    ]);
+    await page.goto('/AI/index.html');
 
     await expect(page).toHaveURL(/\/AI\/index\.html$/i);
 

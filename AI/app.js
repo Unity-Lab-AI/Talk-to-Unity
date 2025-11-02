@@ -1021,7 +1021,7 @@ function parseAiDirectives(responseText) {
     return { cleanedText, commands: uniqueCommands };
 }
 
-async function executeAiCommand(command) {
+async function executeAiCommand(command, options = {}) {
     if (!command) {
         return false;
     }
@@ -1044,13 +1044,13 @@ async function executeAiCommand(command) {
             });
             return true;
         case 'copy_image':
-            await copyImageToClipboard();
+            await copyImageToClipboard(options.imageUrl);
             return true;
         case 'save_image':
-            await saveImage();
+            await saveImage(options.imageUrl);
             return true;
         case 'open_image':
-            openImageInNewTab();
+            openImageInNewTab(options.imageUrl);
             return true;
         case 'set_model_flux':
             currentImageModel = 'flux';
@@ -1295,13 +1295,19 @@ async function getAIResponse(userInput) {
         }
 
         const { cleanedText, commands } = parseAiDirectives(aiText);
-
-        for (const command of commands) {
-            await executeAiCommand(command);
-        }
-
         const assistantMessage = cleanedText || aiText;
         const imageUrlFromResponse = extractImageUrl(aiText) || extractImageUrl(assistantMessage);
+
+        const imageCommandQueue = [];
+        for (const command of commands) {
+            const normalizedCommand = normalizeCommandValue(command);
+            if (['copy_image', 'save_image', 'open_image'].includes(normalizedCommand)) {
+                imageCommandQueue.push(normalizedCommand);
+                continue;
+            }
+
+            await executeAiCommand(normalizedCommand);
+        }
 
         const fallbackPrompt = buildFallbackImagePrompt(userInput, assistantMessage);
         let fallbackImageUrl = '';
@@ -1333,6 +1339,14 @@ async function getAIResponse(userInput) {
         }
 
         const shouldSuppressSpeech = commands.includes('shutup') || commands.includes('stop_speaking');
+
+        if (imageCommandQueue.length > 0) {
+            await heroImagePromise;
+            const imageTarget = selectedImageUrl || getImageUrl() || pendingHeroUrl;
+            for (const command of imageCommandQueue) {
+                await executeAiCommand(command, { imageUrl: imageTarget });
+            }
+        }
 
         if (!shouldSuppressSpeech) {
             const spokenText = sanitizeForSpeech(finalAssistantMessage);
@@ -1442,8 +1456,8 @@ function updateHeroImage(imageUrl) {
     });
 }
 
-async function copyImageToClipboard() {
-    const imageUrl = getImageUrl();
+async function copyImageToClipboard(imageUrlOverride) {
+    const imageUrl = imageUrlOverride || getImageUrl() || pendingHeroUrl;
     if (!imageUrl) {
         return;
     }
@@ -1459,8 +1473,8 @@ async function copyImageToClipboard() {
     }
 }
 
-async function saveImage() {
-    const imageUrl = getImageUrl();
+async function saveImage(imageUrlOverride) {
+    const imageUrl = imageUrlOverride || getImageUrl() || pendingHeroUrl;
     if (!imageUrl) {
         return;
     }
@@ -1484,8 +1498,8 @@ async function saveImage() {
     }
 }
 
-function openImageInNewTab() {
-    const imageUrl = getImageUrl();
+function openImageInNewTab(imageUrlOverride) {
+    const imageUrl = imageUrlOverride || getImageUrl() || pendingHeroUrl;
     if (!imageUrl) {
         return;
     }
