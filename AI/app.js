@@ -1,16 +1,10 @@
-const landingSection = document.getElementById('landing');
-const appRoot = document.getElementById('app-root');
 const heroStage = document.getElementById('hero-stage');
 const heroImage = document.getElementById('hero-image');
 const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
-const dependencyLight = document.querySelector('[data-role="dependency-light"]');
-const dependencySummary = document.getElementById('dependency-summary');
-const dependencyList = document.getElementById('dependency-list');
-const launchButton = document.getElementById('launch-app');
-const recheckButton = document.getElementById('recheck-dependencies');
+const loadingIndicator = document.getElementById('loading-indicator');
 
 if (heroImage) {
     heroImage.setAttribute('crossorigin', 'anonymous');
@@ -33,34 +27,8 @@ let currentHeroUrl = '';
 let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
-let appStarted = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
-
-const dependencyChecks = [
-    {
-        id: 'secure-context',
-        label: 'Secure context (HTTPS or localhost)',
-        check: () =>
-            Boolean(window.isSecureContext) ||
-            /^localhost$|^127(?:\.\d{1,3}){3}$|^\[::1\]$/.test(window.location.hostname)
-    },
-    {
-        id: 'speech-recognition',
-        label: 'Web Speech Recognition API',
-        check: () => Boolean(SpeechRecognition)
-    },
-    {
-        id: 'speech-synthesis',
-        label: 'Speech synthesis voices',
-        check: () => typeof synth !== 'undefined' && typeof synth.speak === 'function'
-    },
-    {
-        id: 'microphone',
-        label: 'Microphone access',
-        check: () => Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-    }
-];
 
 if (heroStage && !heroStage.dataset.state) {
     heroStage.dataset.state = 'empty';
@@ -100,17 +68,18 @@ function resolveAssetPath(relativePath) {
     }
 }
 
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    evaluateDependencies();
-
-    launchButton?.addEventListener('click', async () => {
-        evaluateDependencies({ announce: true });
-        await startApplication();
-    });
-
-    recheckButton?.addEventListener('click', () => {
-        evaluateDependencies({ announce: true });
-    });
+    startApplication();
 });
 
 window.addEventListener('focus', () => {
@@ -278,22 +247,8 @@ function updateDependencyUI(results, allMet, { announce = false } = {}) {
 }
 
 async function startApplication() {
-    if (appStarted) {
-        return;
-    }
-
-    appStarted = true;
-
-    if (appRoot?.hasAttribute('hidden')) {
-        appRoot.removeAttribute('hidden');
-    }
-
     if (bodyElement) {
         bodyElement.dataset.appState = 'experience';
-    }
-
-    if (landingSection) {
-        landingSection.setAttribute('aria-hidden', 'true');
     }
 
     if (heroStage) {
@@ -305,7 +260,7 @@ async function startApplication() {
 
     applyTheme(currentTheme);
     await loadSystemPrompt();
-    setupSpeechRecognition();
+    await setupSpeechRecognition();
     updateMuteIndicator();
     await initializeVoiceControl();
     applyTheme(currentTheme, { force: true });
@@ -481,18 +436,28 @@ async function loadSystemPrompt() {
     }
 }
 
-function setupSpeechRecognition() {
-    if (!SpeechRecognition) {
-        console.error('Speech recognition is not supported in this browser.');
-        alert('Speech recognition is not supported in this browser.');
-        setCircleState(userCircle, {
-            label: 'Speech recognition is not supported in this browser',
-            error: true
-        });
-        return;
+async function setupSpeechRecognition() {
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+    } else {
+        try {
+            if (loadingIndicator) loadingIndicator.hidden = false;
+            await loadScript('https://cdn.jsdelivr.net/npm/vosk-browser@0.0.5/dist/vosk.js');
+            const model = await Vosk.createModel('/vosk-model-small-en-us-0.15.zip');
+            recognition = new model.KaldiRecognizer();
+            if (loadingIndicator) loadingIndicator.hidden = true;
+        } catch (error) {
+            console.error('Failed to load Vosklet:', error);
+            if (loadingIndicator) loadingIndicator.hidden = true;
+            alert('Failed to load speech recognition model. Please try again later.');
+            setCircleState(userCircle, {
+                label: 'Speech recognition model failed to load',
+                error: true
+            });
+            return;
+        }
     }
 
-    recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.lang = 'en-US';
     recognition.interimResults = false;
@@ -1436,12 +1401,6 @@ async function getAIResponse(userInput) {
             }
         }
 
-        return {
-            text: finalAssistantMessage,
-            rawText: aiText,
-            imageUrl: selectedImageUrl,
-            commands
-        };
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
         setCircleState(aiCircle, {
@@ -1455,8 +1414,6 @@ async function getAIResponse(userInput) {
                 label: 'Unity is idle'
             });
         }, 2400);
-
-        return { error };
     }
 }
 
@@ -1586,37 +1543,4 @@ function openImageInNewTab(imageUrlOverride) {
 
     window.open(imageUrl, '_blank');
     speak('Image opened in new tab.');
-}
-
-if (!launchButton && !landingSection) {
-    startApplication().catch((error) => {
-        console.error('Failed to auto-start the Unity voice experience:', error);
-    });
-}
-
-if (typeof window !== 'undefined') {
-    const setMutedStateHandler = setMutedState;
-    window.setMutedState = (muted, options) => setMutedStateHandler(muted, options);
-
-    Object.defineProperty(window, '__unityTestHooks', {
-        value: {
-            isAppReady: () => appStarted,
-            getChatHistory: () => chatHistory.map((entry) => ({ ...entry })),
-            getCurrentHeroImage: () => getImageUrl(),
-            setHeroImage: (dataUrl) => updateHeroImage(dataUrl),
-            sendUserInput: async (input) => {
-                if (typeof input !== 'string' || !input.trim()) {
-                    return { error: new Error('Input must be a non-empty string.') };
-                }
-
-                if (!appStarted) {
-                    await startApplication();
-                }
-
-                return getAIResponse(input.trim());
-            }
-        },
-        configurable: true,
-        enumerable: false
-    });
 }

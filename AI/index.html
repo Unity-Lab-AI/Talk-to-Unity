@@ -5,14 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unity Voice Chat</title>
     <!-- build:css -->
-    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="/ai/style.css">
     <!-- endbuild css -->
     <!-- build:js -->
-    <script defer src="./app.js"></script>
+    <script defer src="/ai/app.js"></script>
     <!-- endbuild js -->
 </head>
 
 <body class="no-js">
+    <div id="loading-indicator" class="loading-indicator" hidden>
+        <div class="spinner"></div>
+        <p>Loading speech model...</p>
+    </div>
     <noscript>
         <div class="no-js-banner" role="alert">
             <strong>JavaScript is disabled.</strong>

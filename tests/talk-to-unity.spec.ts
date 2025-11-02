@@ -416,7 +416,9 @@ test('user can launch Talk to Unity and receive AI response with image and speec
 
     await page.goto('/AI/index.html');
 
-    await expect(page).toHaveURL(/\/AI\/index\.html$/i);
+    // Wait for landing to hide and app to show
+    await expect(page.locator('#landing')).toBeHidden();
+    await expect(page.locator('#app-root')).toBeVisible();
 
     await page.waitForFunction(() => Boolean(window.__unityTestHooks?.isAppReady()));
 
