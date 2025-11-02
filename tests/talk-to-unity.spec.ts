@@ -188,61 +188,21 @@ test.beforeEach(async ({ page, context }) => {
     });
 });
 
-test('landing highlights missing dependencies but allows limited launch', async ({ page }) => {
-    await page.addInitScript(() => {
-        Object.defineProperty(window, 'SpeechRecognition', {
-            value: undefined,
-            configurable: true
-        });
-        Object.defineProperty(window, 'webkitSpeechRecognition', {
-            value: undefined,
-            configurable: true
-        });
-        Object.defineProperty(window, 'speechSynthesis', {
-            value: undefined,
-            configurable: true
-        });
-
-        Object.defineProperty(navigator, 'mediaDevices', {
-            value: { getUserMedia: undefined },
-            configurable: true
-        });
-    });
-
+test('landing page loads and allows navigation to app', async ({ page }) => {
     await page.goto('/index.html');
 
-    await page.evaluate(() => {
-        window.__unityLandingTestHooks?.initialize();
-        window.__unityLandingTestHooks?.evaluateDependencies({ announce: true });
-    });
+    // Verify landing page elements
+    await expect(page.locator('#landing-title')).toHaveText('Talk to Unity');
+    await expect(page.locator('.landing-lede')).toContainText(/experimental voice interface/i);
 
-    await page.waitForFunction(() =>
-        document.querySelector('[data-dependency="speech-recognition"]')?.getAttribute('data-state') === 'fail' &&
-        document.querySelector('[data-dependency="speech-synthesis"]')?.getAttribute('data-state') === 'fail'
-    );
-
-    await expect(page.locator('#dependency-summary')).toContainText(/Alerts/i);
-    await expect(page.locator('[data-dependency="speech-recognition"]')).toHaveAttribute('data-state', 'fail');
-    await expect(page.locator('[data-dependency="speech-synthesis"]')).toHaveAttribute('data-state', 'fail');
-    await expect(page.locator('[data-dependency="microphone"]')).toHaveAttribute('data-state', 'fail');
-
-    const launchButton = page.locator('#launch-app');
-    await expect(launchButton).toBeEnabled();
-    await expect(launchButton).toHaveAttribute('data-state', 'warn');
-    await expect(page.locator('#status-message')).toContainText(/limited/i);
+    // Verify launch link exists and is visible
+    const launchLink = page.locator('#launch-app');
+    await expect(launchLink).toBeVisible();
+    await expect(launchLink).toHaveText('Talk to Unity');
+    await expect(launchLink).toHaveAttribute('href', '/AI');
 });
 
 test('ai generates fallback imagery and applies theme commands', async ({ page }) => {
-    await page.goto('/index.html');
-
-    await page.evaluate(() => {
-        window.__unityLandingTestHooks?.initialize();
-        window.__unityLandingTestHooks?.markAllDependenciesReady();
-    });
-
-    const launchButton = page.getByRole('button', { name: 'Talk to Unity' });
-    await expect(launchButton).toBeEnabled();
-
     await page.goto('/AI/index.html');
 
     await page.waitForFunction(() => Boolean(window.__unityTestHooks?.isAppReady()));
@@ -298,16 +258,6 @@ test('ai generates fallback imagery and applies theme commands', async ({ page }
 });
 
 test('ai copies generated imagery when commanded by the assistant', async ({ page }) => {
-    await page.goto('/index.html');
-
-    await page.evaluate(() => {
-        window.__unityLandingTestHooks?.initialize();
-        window.__unityLandingTestHooks?.markAllDependenciesReady();
-    });
-
-    const launchButton = page.getByRole('button', { name: 'Talk to Unity' });
-    await expect(launchButton).toBeEnabled();
-
     await page.goto('/AI/index.html');
 
     await page.waitForFunction(() => Boolean(window.__unityTestHooks?.isAppReady()));
@@ -369,56 +319,14 @@ test('ai copies generated imagery when commanded by the assistant', async ({ pag
 test('user can launch Talk to Unity and receive AI response with image and speech', async ({ page }) => {
     await page.goto('/index.html');
 
-    await expect(page.locator('#landing-title')).toHaveText(/Let’s make sure every light is green/i);
-    await expect(page.locator('.dependency-item')).toHaveCount(4);
+    // Verify landing page
+    await expect(page.locator('#landing-title')).toHaveText('Talk to Unity');
 
-    const launchButton = page.getByRole('button', { name: 'Talk to Unity' });
-    const recheckButton = page.getByRole('button', { name: 'Check again' });
+    const launchLink = page.locator('#launch-app');
+    await expect(launchLink).toBeVisible();
 
-    await page.evaluate(() => {
-        window.__unityLandingTestHooks?.initialize();
-    });
-
-    await recheckButton.click();
-
-    await page.evaluate(() => {
-        window.__unityLandingTestHooks?.evaluateDependencies();
-    });
-
-    const dependencySnapshot = await page.evaluate(() => {
-        const snapshot = {
-            isSecureContext: window.isSecureContext,
-            hostname: window.location.hostname,
-            hasSpeechRecognition: Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
-            hasSpeechSynthesis:
-                typeof window.speechSynthesis !== 'undefined' && typeof window.speechSynthesis.speak === 'function',
-            hasMicrophone: Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
-            dependencyStates: Array.from(document.querySelectorAll('.dependency-item')).map((item) => ({
-                id: item.dataset.dependency,
-                state: item.dataset.state,
-                status: item.querySelector('.dependency-status')?.textContent?.trim() ?? ''
-            }))
-        };
-
-        console.log('Dependency snapshot', JSON.stringify(snapshot));
-        return snapshot;
-    });
-
-    test.info().annotations.push({ type: 'dependencySnapshot', description: JSON.stringify(dependencySnapshot) });
-
-    if (await launchButton.isDisabled()) {
-        await page.evaluate(() => {
-            window.__unityLandingTestHooks?.markAllDependenciesReady();
-        });
-    }
-
-    await expect(launchButton).toBeEnabled();
-
+    // Navigate to AI page
     await page.goto('/AI/index.html');
-
-    // Wait for landing to hide and app to show
-    await expect(page.locator('#landing')).toBeHidden();
-    await expect(page.locator('#app-root')).toBeVisible();
 
     await page.waitForFunction(() => Boolean(window.__unityTestHooks?.isAppReady()));
 

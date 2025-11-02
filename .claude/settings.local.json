@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(python -m http.server:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(node test_regex_patterns.js:*)",
+      "Bash(node -e:*)",
+      "Bash(node debug_regex.js:*)",
+      "Bash(dir AI)",
+      "Bash(dir:*)",
+      "Bash(cd:*)",
+      "Bash(git fetch:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git reset:*)",
+      "Bash(git push:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
