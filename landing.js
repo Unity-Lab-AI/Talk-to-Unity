@@ -261,7 +261,7 @@
         }
 
         if (launchButton) {
-            launchButton.href = allMet ? '/ai' : '#';
+            launchButton.href = allMet ? '/AI' : '#';
             if(!allMet) {
                 launchButton.addEventListener('click', (e) => {
                     e.preventDefault();
