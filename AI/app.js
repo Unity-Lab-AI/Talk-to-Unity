@@ -754,10 +754,10 @@ function removeMarkdownLinkTargets(value) {
         .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, altText, url) => {
             return isLikelyUrlSegment(url) ? altText : _match;
         })
-        .replace(/\?\[([^\]]*)\]\(([^)]+)\)/g, (_match, linkText, url) => {
+        .replace(/\\\[([^\]]*)\]\(([^)]+)\)/g, (_match, linkText, url) => {
             return isLikelyUrlSegment(url) ? linkText : _match;
         })
-        .replace(/\?\[(?:command|action)[^\]]*\]\([^)]*\)/gi, ' ');
+        .replace(/\\\[(?:command|action)[^\]]*\]\([^)]*\)/gi, ' ');
 }
 
 function removeCommandArtifacts(value) {
@@ -766,13 +766,11 @@ function removeCommandArtifacts(value) {
     }
 
     let result = value
-        .replace(/\?\[[^\\\]]*\bcommand\b[^\\\]]*\]/gi, ' ')
+        .replace(/\\\[[^\\]]*\bcommand\b[^\\]*\]/gi, ' ')
         .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
         .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
-        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,
--]+/gi, ' ')
-        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,
--]+/gi, ' ')
+        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_\s,-]+/gi, ' ')
+        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_\s,-]+/gi, ' ')
         .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
         .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
 
@@ -787,7 +785,7 @@ function sanitizeForSpeech(text) {
     }
 
     const withoutDirectives = text
-        .replace(/\?\[command:[^\\\]]*\]/gi, ' ')
+        .replace(/\\\[command:[^\\]*\]/gi, ' ')
         .replace(/\{\{command:[^}]*\}\}/gi, ' ')
         .replace(/<command[^>]*>[^<]*<\/command>/gi, ' ')
         .replace(/\b(?:command|action)\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
@@ -860,7 +858,7 @@ function sanitizeForSpeech(text) {
         .replace(/\s{2,}/g, ' ')
         .replace(/\s+([.,!?;:])/g, '$1')
         .replace(/\(\s*\)/g, '')
-        .replace(/\?\[\s*\]/g, '')
+        .replace(/\\\[\s*\]/g, '')
         .replace(/\{\s*\}/g, '')
         .replace(/\b(?:https?|www)\b/gi, '')
         .replace(/\b[a-z0-9]+\s+dot\s+[a-z0-9]+\b/gi, '')
@@ -882,7 +880,7 @@ function sanitizeImageUrl(rawUrl) {
     return rawUrl
         .trim()
         .replace(/^["'<\\\\[({]+/g, '')
-        .replace(/["'>)\]}]+$/g, '')
+        .replace(/["'>)\\]}]+$/g, '')
         .replace(/[,.;!]+$/g, '');
 }
 
@@ -997,7 +995,7 @@ function extractImageUrl(text) {
         return '';
     }
 
-    const markdownMatch = text.match(/!\[[^]]*\]\((https?:\/\/[^)\s]+)\)/i);
+    const markdownMatch = text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
     if (markdownMatch && markdownMatch[1]) {
         return sanitizeImageUrl(markdownMatch[1]);
     }
@@ -1047,7 +1045,7 @@ function removeImageReferences(text, imageUrl) {
             .replace(/\bart(?:work)?\s+(?:url|link)\s*:?/gi, '')
             .replace(/<\s*>/g, '')
             .replace(/\(\s*\)/g, '')
-            .replace(/\?\[\s*\]/g, '');
+            .replace(/\\\[\s*\]/g, '');
 
     return result
         .replace(/\n{3,}/g, '\n\n')
@@ -1069,7 +1067,7 @@ function parseAiDirectives(responseText) {
     let workingText = responseText;
 
     const patterns = [
-        /\?\[command:\s*([^\\\]]+)\]/gi,
+        /\\\[command:\s*([^\\]+)\]/gi,
         /\{\{command:\s*([^}]*)\}\}/gi,
         /<command[^>]*>\s*([^<]*)<\/command>/gi,
         /\bcommand\s*[:=]\s*([a-z0-9_\-]+)/gi,
