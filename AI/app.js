@@ -25,6 +25,18 @@ if (bodyElement) {
 
 let currentImageModel = 'flux';
 let chatHistory = [];
+
+function appendToChatHistory(entry) {
+    if (!entry || typeof entry !== 'object') {
+        return;
+    }
+
+    chatHistory.push(entry);
+
+    if (chatHistory.length > 12) {
+        chatHistory.splice(0, chatHistory.length - 12);
+    }
+}
 let systemPrompt = '';
 let recognition = null;
 let isMuted = true;
@@ -1069,7 +1081,7 @@ function parseAiDirectives(responseText) {
         });
     }
 
-    const slashCommandRegex = /(?:^|\s)\/(open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\b/gi;
+    const slashCommandRegex = /(?:^|\s)\/(open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark|playwrite)\b/gi;
     workingText = workingText.replace(slashCommandRegex, (_match, commandValue) => {
         const normalized = normalizeCommandValue(commandValue);
         if (normalized) {
@@ -1153,6 +1165,9 @@ async function executeAiCommand(command, options = {}) {
             return true;
         case 'theme_dark':
             applyTheme('dark', { announce: true });
+            return true;
+        case 'playwrite':
+            await handlePlaywriteAbility(options);
             return true;
         default:
             return false;
@@ -1330,118 +1345,137 @@ function handleVoiceCommand(command) {
 
 const POLLINATIONS_TEXT_URL = 'https://text.pollinations.ai/openai';
 const UNITY_REFERRER = 'https://www.unityailab.com/';
+const PLAYWRITE_EXECUTION_URL = '/api/tools/playwrite';
+const PLAYWRITE_PLAN_PROMPT = [
+    'TOOL REQUEST: Playwrite automation has been activated.',
+    'Respond only with a JSON object containing the following keys:',
+    '"objective" — a short description of the research goal.',
+    '"queries" — an array with one to three precise search queries.',
+    '"followUpQuestion" — optional question to ask after reviewing the results.',
+    '"sites" — optional array of preferred domains to visit.',
+    'Do not include commentary outside the JSON object.'
+].join('\n');
+const PLAYWRITE_MAX_RESULTS = 5;
+
+async function fetchPollinationsText(messages) {
+    const pollinationsPayload = JSON.stringify({
+        messages,
+        model: 'unity'
+    });
+
+    const textResponse = await fetch(POLLINATIONS_TEXT_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        // Explicitly identify the Unity AI Lab referrer so the public
+        // Pollinations endpoint treats the request as coming from the
+        // approved web client even when running the app from localhost.
+        referrer: UNITY_REFERRER,
+        referrerPolicy: 'strict-origin-when-cross-origin',
+        body: pollinationsPayload
+    });
+
+    if (!textResponse.ok) {
+        throw new Error(`Pollinations text API returned ${textResponse.status}`);
+    }
+
+    const data = await textResponse.json();
+    const aiText = data.choices?.[0]?.message?.content ?? '';
+
+    if (!aiText) {
+        throw new Error('Received empty response from Pollinations AI');
+    }
+
+    return aiText;
+}
+
+async function processAiReply(aiText, { userInput }) {
+    const { cleanedText, commands } = parseAiDirectives(aiText);
+    const assistantMessage = cleanedText || aiText;
+    const imageUrlFromResponse = extractImageUrl(aiText) || extractImageUrl(assistantMessage);
+
+    const imageCommandQueue = [];
+    const commandContext = {
+        userInput,
+        assistantMessage,
+        rawText: aiText
+    };
+
+    for (const command of commands) {
+        const normalizedCommand = normalizeCommandValue(command);
+        if (['copy_image', 'save_image', 'open_image'].includes(normalizedCommand)) {
+            imageCommandQueue.push(normalizedCommand);
+            continue;
+        }
+
+        await executeAiCommand(normalizedCommand, commandContext);
+    }
+
+    const fallbackPrompt = buildFallbackImagePrompt(userInput, assistantMessage);
+    let fallbackImageUrl = '';
+    if (
+        shouldRequestFallbackImage({
+            userInput,
+            assistantMessage,
+            fallbackPrompt,
+            existingImageUrl: imageUrlFromResponse
+        })
+    ) {
+        fallbackImageUrl = buildPollinationsImageUrl(fallbackPrompt, { model: currentImageModel });
+    }
+
+    const selectedImageUrl = imageUrlFromResponse || fallbackImageUrl;
+
+    const assistantMessageWithoutImage = selectedImageUrl
+        ? removeImageReferences(assistantMessage, selectedImageUrl)
+        : assistantMessage;
+
+    const finalAssistantMessage = assistantMessageWithoutImage.replace(/\n{3,}/g, '\n\n').trim();
+    const chatAssistantMessage = finalAssistantMessage || '[image]';
+
+    appendToChatHistory({ role: 'assistant', content: chatAssistantMessage });
+
+    let heroImagePromise = Promise.resolve(false);
+    if (selectedImageUrl) {
+        heroImagePromise = updateHeroImage(selectedImageUrl);
+    }
+
+    const shouldSuppressSpeech = commands.includes('shutup') || commands.includes('stop_speaking');
+
+    if (imageCommandQueue.length > 0) {
+        await heroImagePromise;
+        const imageTarget = selectedImageUrl || getImageUrl() || pendingHeroUrl;
+        for (const command of imageCommandQueue) {
+            await executeAiCommand(command, { ...commandContext, imageUrl: imageTarget });
+        }
+    }
+
+    if (!shouldSuppressSpeech) {
+        const spokenText = sanitizeForSpeech(finalAssistantMessage);
+        if (spokenText) {
+            await heroImagePromise;
+            speak(spokenText);
+        }
+    }
+
+    return {
+        text: finalAssistantMessage,
+        rawText: aiText,
+        imageUrl: selectedImageUrl,
+        commands
+    };
+}
 
 async function getAIResponse(userInput) {
     console.log(`Sending to AI: ${userInput}`);
 
-    chatHistory.push({ role: 'user', content: userInput });
-
-    if (chatHistory.length > 12) {
-        chatHistory.splice(0, chatHistory.length - 12);
-    }
-
-    let aiText = '';
+    appendToChatHistory({ role: 'user', content: userInput });
 
     try {
         const messages = [{ role: 'system', content: systemPrompt }, ...chatHistory];
-
-        const pollinationsPayload = JSON.stringify({
-            messages,
-            model: 'unity'
-        });
-
-        const textResponse = await fetch(POLLINATIONS_TEXT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            // Explicitly identify the Unity AI Lab referrer so the public
-            // Pollinations endpoint treats the request as coming from the
-            // approved web client even when running the app from localhost.
-            referrer: UNITY_REFERRER,
-            referrerPolicy: 'strict-origin-when-cross-origin',
-            body: pollinationsPayload,
-        });
-
-        if (!textResponse.ok) {
-            throw new Error(`Pollinations text API returned ${textResponse.status}`);
-        }
-
-        const data = await textResponse.json();
-        aiText = data.choices?.[0]?.message?.content ?? '';
-
-        if (!aiText) {
-            throw new Error('Received empty response from Pollinations AI');
-        }
-
-        const { cleanedText, commands } = parseAiDirectives(aiText);
-        const assistantMessage = cleanedText || aiText;
-        const imageUrlFromResponse = extractImageUrl(aiText) || extractImageUrl(assistantMessage);
-
-        const imageCommandQueue = [];
-        for (const command of commands) {
-            const normalizedCommand = normalizeCommandValue(command);
-            if (['copy_image', 'save_image', 'open_image'].includes(normalizedCommand)) {
-                imageCommandQueue.push(normalizedCommand);
-                continue;
-            }
-
-            await executeAiCommand(normalizedCommand);
-        }
-
-        const fallbackPrompt = buildFallbackImagePrompt(userInput, assistantMessage);
-        let fallbackImageUrl = '';
-        if (
-            shouldRequestFallbackImage({
-                userInput,
-                assistantMessage,
-                fallbackPrompt,
-                existingImageUrl: imageUrlFromResponse
-            })
-        ) {
-            fallbackImageUrl = buildPollinationsImageUrl(fallbackPrompt, { model: currentImageModel });
-        }
-
-        const selectedImageUrl = imageUrlFromResponse || fallbackImageUrl;
-
-        const assistantMessageWithoutImage = selectedImageUrl
-            ? removeImageReferences(assistantMessage, selectedImageUrl)
-            : assistantMessage;
-
-        const finalAssistantMessage = assistantMessageWithoutImage.replace(/\n{3,}/g, '\n\n').trim();
-        const chatAssistantMessage = finalAssistantMessage || '[image]';
-
-        chatHistory.push({ role: 'assistant', content: chatAssistantMessage });
-
-        let heroImagePromise = Promise.resolve(false);
-        if (selectedImageUrl) {
-            heroImagePromise = updateHeroImage(selectedImageUrl);
-        }
-
-        const shouldSuppressSpeech = commands.includes('shutup') || commands.includes('stop_speaking');
-
-        if (imageCommandQueue.length > 0) {
-            await heroImagePromise;
-            const imageTarget = selectedImageUrl || getImageUrl() || pendingHeroUrl;
-            for (const command of imageCommandQueue) {
-                await executeAiCommand(command, { imageUrl: imageTarget });
-            }
-        }
-
-        if (!shouldSuppressSpeech) {
-            const spokenText = sanitizeForSpeech(finalAssistantMessage);
-            if (spokenText) {
-                await heroImagePromise;
-                speak(spokenText);
-            }
-        }
-
-        return {
-            text: finalAssistantMessage,
-            rawText: aiText,
-            imageUrl: selectedImageUrl,
-            commands
-        };
+        const aiText = await fetchPollinationsText(messages);
+        return await processAiReply(aiText, { userInput });
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
         setCircleState(aiCircle, {
@@ -1458,6 +1492,364 @@ async function getAIResponse(userInput) {
 
         return { error };
     }
+}
+
+function resolvePlaywriteEndpoint() {
+    if (typeof window !== 'undefined' && typeof window.__unityPlaywriteEndpoint === 'string') {
+        return window.__unityPlaywriteEndpoint;
+    }
+
+    return PLAYWRITE_EXECUTION_URL;
+}
+
+function parseJsonFromText(text) {
+    if (typeof text !== 'string') {
+        return null;
+    }
+
+    const trimmed = text.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const candidates = new Set();
+
+    const fencedMatch = trimmed.match(/```json?\s*([\s\S]*?)```/i);
+    if (fencedMatch && fencedMatch[1]) {
+        candidates.add(fencedMatch[1].trim());
+    }
+
+    if (trimmed.startsWith('```') && trimmed.endsWith('```')) {
+        candidates.add(trimmed.replace(/^```json?/i, '').replace(/```$/, '').trim());
+    }
+
+    candidates.add(trimmed);
+
+    for (const candidate of candidates) {
+        if (!candidate) {
+            continue;
+        }
+
+        try {
+            return JSON.parse(candidate);
+        } catch (error) {
+            continue;
+        }
+    }
+
+    const firstBrace = trimmed.indexOf('{');
+    const lastBrace = trimmed.lastIndexOf('}');
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const snippet = trimmed.slice(firstBrace, lastBrace + 1);
+        try {
+            return JSON.parse(snippet);
+        } catch (error) {
+            // Ignore parse failure and fall through to null.
+        }
+    }
+
+    return null;
+}
+
+function normalizePlaywritePlan(plan) {
+    if (!plan || typeof plan !== 'object') {
+        return null;
+    }
+
+    const objective = typeof plan.objective === 'string' ? plan.objective.trim() : '';
+
+    const queries = [];
+    if (Array.isArray(plan.queries)) {
+        for (const entry of plan.queries) {
+            if (typeof entry === 'string' && entry.trim()) {
+                queries.push(entry.trim());
+            }
+        }
+    }
+
+    if (typeof plan.query === 'string' && plan.query.trim()) {
+        queries.push(plan.query.trim());
+    }
+
+    const uniqueQueries = [...new Set(queries)].slice(0, 3);
+
+    if (uniqueQueries.length === 0) {
+        return null;
+    }
+
+    const siteCandidates = [];
+    if (Array.isArray(plan.sites)) {
+        siteCandidates.push(...plan.sites);
+    }
+    if (Array.isArray(plan.sources)) {
+        siteCandidates.push(...plan.sources);
+    }
+
+    const sites = siteCandidates
+        .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+        .filter((entry) => entry)
+        .slice(0, 5);
+
+    const followUpQuestion =
+        typeof plan.followUpQuestion === 'string'
+            ? plan.followUpQuestion.trim()
+            : typeof plan.followupquestion === 'string'
+            ? plan.followupquestion.trim()
+            : '';
+
+    return {
+        objective,
+        queries: uniqueQueries,
+        sites,
+        followUpQuestion
+    };
+}
+
+async function requestPlaywritePlan() {
+    const planPromptMessage = {
+        role: 'user',
+        content: PLAYWRITE_PLAN_PROMPT
+    };
+
+    const messages = [{ role: 'system', content: systemPrompt }, ...chatHistory, planPromptMessage];
+    const aiText = await fetchPollinationsText(messages);
+    const parsedPlan = parseJsonFromText(aiText);
+
+    appendToChatHistory(planPromptMessage);
+    appendToChatHistory({ role: 'assistant', content: aiText.trim() || '[playwrite-plan]' });
+
+    const normalizedPlan = normalizePlaywritePlan(parsedPlan);
+
+    if (!normalizedPlan) {
+        throw new Error('Playwrite plan was not provided in the expected JSON format.');
+    }
+
+    return {
+        ...normalizedPlan,
+        raw: parsedPlan,
+        rawResponse: aiText
+    };
+}
+
+function describeError(error) {
+    if (error instanceof Error && typeof error.message === 'string') {
+        return error.message;
+    }
+
+    if (typeof error === 'string') {
+        return error;
+    }
+
+    if (error && typeof error === 'object' && typeof error.toString === 'function') {
+        return error.toString();
+    }
+
+    return 'Unknown error';
+}
+
+async function executePlaywritePlan(plan) {
+    const endpoint = resolvePlaywriteEndpoint();
+    const payload = {
+        objective: plan.objective,
+        queries: plan.queries,
+        sites: plan.sites,
+        followUpQuestion: plan.followUpQuestion
+    };
+
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error(`Playwrite endpoint returned ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const results = Array.isArray(data?.results)
+        ? data.results
+              .map((entry) => {
+                  const title = typeof entry?.title === 'string' ? entry.title.trim() : '';
+                  const url = typeof entry?.url === 'string' ? entry.url.trim() : '';
+                  const snippet = typeof entry?.snippet === 'string' ? entry.snippet.trim() : '';
+
+                  if (!title && !url && !snippet) {
+                      return null;
+                  }
+
+                  return {
+                      title,
+                      url,
+                      snippet
+                  };
+              })
+              .filter(Boolean)
+              .slice(0, PLAYWRITE_MAX_RESULTS)
+        : [];
+
+    const summary = typeof data?.summary === 'string' ? data.summary.trim() : '';
+    const notes = typeof data?.notes === 'string' ? data.notes.trim() : '';
+    const followUp = typeof data?.followUp === 'string' ? data.followUp.trim() : '';
+
+    return {
+        results,
+        summary,
+        notes,
+        followUp,
+        raw: data
+    };
+}
+
+function formatPlaywriteResultsForAI(plan, findings) {
+    const lines = ['TOOL RESULT: Playwrite automation completed.'];
+
+    if (plan.objective) {
+        lines.push(`Objective: ${plan.objective}`);
+    }
+
+    if (plan.queries.length > 0) {
+        lines.push('Queries:');
+        plan.queries.forEach((query, index) => {
+            lines.push(`${index + 1}. ${query}`);
+        });
+    }
+
+    if (plan.sites.length > 0) {
+        lines.push(`Preferred sites: ${plan.sites.join(', ')}`);
+    }
+
+    lines.push('Findings:');
+
+    if (findings.results.length === 0) {
+        lines.push('- No relevant pages were discovered.');
+    } else {
+        findings.results.forEach((result, index) => {
+            const pieces = [];
+            if (result.title) {
+                pieces.push(result.title);
+            }
+            if (result.url) {
+                pieces.push(result.url);
+            }
+
+            const heading = pieces.length > 0 ? pieces.join(' — ') : `Result ${index + 1}`;
+            lines.push(`${index + 1}. ${heading}`);
+
+            if (result.snippet) {
+                lines.push(`   ${result.snippet}`);
+            }
+        });
+    }
+
+    if (findings.summary) {
+        lines.push(`Summary: ${findings.summary}`);
+    }
+
+    if (findings.notes) {
+        lines.push(`Notes: ${findings.notes}`);
+    }
+
+    if (plan.followUpQuestion) {
+        lines.push(`Follow-up question from plan: ${plan.followUpQuestion}`);
+    }
+
+    if (findings.followUp) {
+        lines.push(`Tool follow-up: ${findings.followUp}`);
+    }
+
+    return lines.join('\n');
+}
+
+function formatPlaywriteFailureReport({ stage, plan, error }) {
+    const lines = ['TOOL RESULT: Playwrite automation failed.'];
+    lines.push(`Stage: ${stage}`);
+
+    if (plan?.objective) {
+        lines.push(`Objective: ${plan.objective}`);
+    }
+
+    if (plan?.queries?.length) {
+        lines.push('Queries:');
+        plan.queries.forEach((query, index) => {
+            lines.push(`${index + 1}. ${query}`);
+        });
+    }
+
+    if (plan?.sites?.length) {
+        lines.push(`Preferred sites: ${plan.sites.join(', ')}`);
+    }
+
+    if (plan?.followUpQuestion) {
+        lines.push(`Follow-up question from plan: ${plan.followUpQuestion}`);
+    }
+
+    const errorDescription = describeError(error);
+    if (errorDescription) {
+        lines.push(`Error: ${errorDescription}`);
+    }
+
+    return lines.join('\n');
+}
+
+async function reportPlaywriteOutcome(reportMessage, userInput) {
+    appendToChatHistory({ role: 'user', content: reportMessage });
+
+    const messages = [{ role: 'system', content: systemPrompt }, ...chatHistory];
+    const aiText = await fetchPollinationsText(messages);
+    return processAiReply(aiText, { userInput });
+}
+
+async function handlePlaywriteAbility(options = {}) {
+    const userInput = typeof options.userInput === 'string' ? options.userInput : '';
+
+    let plan;
+    let planError = null;
+
+    try {
+        plan = await requestPlaywritePlan();
+    } catch (error) {
+        planError = error;
+    }
+
+    if (!plan) {
+        const failureReport = formatPlaywriteFailureReport({ stage: 'plan', plan: null, error: planError });
+
+        try {
+            await reportPlaywriteOutcome(failureReport, userInput);
+        } catch (reportError) {
+            console.error('Failed to report Playwrite planning error:', reportError);
+            speak('I could not gather details for Playwrite.');
+        }
+
+        return true;
+    }
+
+    let findings = null;
+    let executionError = null;
+
+    try {
+        findings = await executePlaywritePlan(plan);
+    } catch (error) {
+        executionError = error;
+    }
+
+    const reportMessage = findings
+        ? formatPlaywriteResultsForAI(plan, findings)
+        : formatPlaywriteFailureReport({ stage: 'execution', plan, error: executionError });
+
+    try {
+        await reportPlaywriteOutcome(reportMessage, userInput);
+    } catch (error) {
+        console.error('Failed to report Playwrite results:', error);
+        speak('I ran into trouble sharing the Playwrite findings.');
+    }
+
+    return true;
 }
 
 function getImageUrl() {

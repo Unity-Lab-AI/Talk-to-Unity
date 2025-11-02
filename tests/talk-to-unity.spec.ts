@@ -366,6 +366,115 @@ test('ai copies generated imagery when commanded by the assistant', async ({ pag
     expect(result.speakCalls.some((entry) => /image copied to clipboard/i.test(entry))).toBe(true);
 });
 
+test('ai completes a playwrite research loop', async ({ page }) => {
+    await page.goto('/index.html');
+
+    await page.evaluate(() => {
+        window.__unityLandingTestHooks?.initialize();
+        window.__unityLandingTestHooks?.markAllDependenciesReady();
+    });
+
+    await page.goto('/AI/index.html');
+
+    await page.waitForFunction(() => Boolean(window.__unityTestHooks?.isAppReady()));
+
+    await page.unroute('https://text.pollinations.ai/openai');
+
+    const pollinationsResponses = [
+        {
+            choices: [
+                {
+                    message: {
+                        content: '[command: playwrite]\nLet me investigate that with Playwrite.'
+                    }
+                }
+            ]
+        },
+        {
+            choices: [
+                {
+                    message: {
+                        content:
+                            '{"objective":"Investigate the latest Unity AI Lab update","queries":["Unity AI Lab latest news"],"followUpQuestion":"Highlight the most exciting change."}'
+                    }
+                }
+            ]
+        },
+        {
+            choices: [
+                {
+                    message: {
+                        content:
+                            'Unity AI Lab rolled out a new conversational skill. Source: https://example.com/unity-ai-lab-update'
+                    }
+                }
+            ]
+        }
+    ];
+
+    let pollinationCallCount = 0;
+    await page.route('https://text.pollinations.ai/openai', async (route) => {
+        const fallbackResponse = pollinationsResponses[pollinationsResponses.length - 1];
+        const response = pollinationsResponses[pollinationCallCount] ?? fallbackResponse;
+        pollinationCallCount += 1;
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(response)
+        });
+    });
+
+    let playwriteCalls = 0;
+    await page.route('**/api/tools/playwrite', async (route) => {
+        playwriteCalls += 1;
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                results: [
+                    {
+                        title: 'Unity AI Lab update',
+                        url: 'https://example.com/unity-ai-lab-update',
+                        snippet: 'Unity AI Lab released new features focused on real-time assistants.'
+                    },
+                    {
+                        title: 'Unity AI recap',
+                        url: 'https://news.example.com/unity-ai-recap',
+                        snippet: 'Round-up of Unity AI Lab improvements and timeline.'
+                    }
+                ],
+                summary: 'Unity AI Lab announced new capabilities for Unity.',
+                notes: 'Collected via automated Playwrite browsing.'
+            })
+        });
+    });
+
+    const outcome = await page.evaluate(async () => {
+        const hooks = window.__unityTestHooks;
+        if (!hooks) {
+            throw new Error('Unity test hooks are not available');
+        }
+
+        const response = await hooks.sendUserInput('Use playwrite to find out.');
+        const history = hooks.getChatHistory();
+
+        return {
+            response,
+            history,
+            speakCalls: window.speechSynthesis.speakCalls.slice()
+        };
+    });
+
+    expect(outcome.response?.commands).toContain('playwrite');
+    const finalMessage = outcome.history.at(-1);
+    expect(finalMessage?.content ?? '').toMatch(/Unity AI Lab announced new capabilities/i);
+    expect(finalMessage?.content ?? '').toMatch(/https:\/\/example.com\/unity-ai-lab-update/);
+    expect(outcome.speakCalls.some((entry) => /unity ai lab announced new capabilities/i.test(entry))).toBe(true);
+    expect(outcome.speakCalls.every((entry) => !/https?:\/\//i.test(entry))).toBe(true);
+    expect(playwriteCalls).toBeGreaterThan(0);
+    expect(pollinationCallCount).toBeGreaterThanOrEqual(3);
+});
+
 test('user can launch Talk to Unity and receive AI response with image and speech', async ({ page }) => {
     await page.goto('/index.html');
 
