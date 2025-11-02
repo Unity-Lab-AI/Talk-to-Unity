@@ -766,11 +766,13 @@ function removeCommandArtifacts(value) {
     }
 
     let result = value
-        .replace(/\?\[[^\\]*command[^\\]*\]/gi, ' ')
-        .replace(/\([^)]*command[^)]*\/gi, ' ')
+        .replace(/\?\[[^\\\]]*\bcommand\b[^\\\]]*\]/gi, ' ')
+        .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
         .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
-        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
-        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
+        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,
+-]+/gi, ' ')
+        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,
+-]+/gi, ' ')
         .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
         .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
 
@@ -785,7 +787,7 @@ function sanitizeForSpeech(text) {
     }
 
     const withoutDirectives = text
-        .replace(/\?\[command:[^\]]*\]/gi, ' ')
+        .replace(/\?\[command:[^\\\]]*\]/gi, ' ')
         .replace(/\{\{command:[^}]*\}\}/gi, ' ')
         .replace(/<command[^>]*>[^<]*<\/command>/gi, ' ')
         .replace(/\b(?:command|action)\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
@@ -880,7 +882,7 @@ function sanitizeImageUrl(rawUrl) {
     return rawUrl
         .trim()
         .replace(/^["'<\\\\[({]+/g, '')
-        .replace(/["'>)\\\]}]+$/g, '')
+        .replace(/["'>)\]}]+$/g, '')
         .replace(/[,.;!]+$/g, '');
 }
 
@@ -933,7 +935,7 @@ function buildFallbackImagePrompt(userInput = '', assistantMessage = '') {
             continue;
         }
 
-        const explicitPromptMatch = source.match(/(?:image\s+prompt|prompt)\s*[:=]\s*"?([^"\n]+)"?/i);
+        const explicitPromptMatch = source.match(/(?:image\s+prompt|prompt)\s*[:=]\s*"?([^"]*)"?/i);
         if (explicitPromptMatch?.[1]) {
             const sanitized = cleanFallbackPrompt(explicitPromptMatch[1]);
             if (sanitized) {
@@ -995,12 +997,12 @@ function extractImageUrl(text) {
         return '';
     }
 
-    const markdownMatch = text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
+    const markdownMatch = text.match(/!\[[^]]*\]\((https?:\/\/[^)\s]+)\)/i);
     if (markdownMatch && markdownMatch[1]) {
         return sanitizeImageUrl(markdownMatch[1]);
     }
 
-    const urlMatch = text.match(/https?:\/\/[^\s)]+/i);
+    const urlMatch = text.match(/https?:\/\/[^)\s]+/i);
     if (urlMatch && urlMatch[0]) {
         return sanitizeImageUrl(urlMatch[0]);
     }
@@ -1009,7 +1011,7 @@ function extractImageUrl(text) {
 }
 
 function escapeRegExp(value) {
-    return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return value.replace(/[-/\\^$*+?.()|[\\]{}]/g, '\\$&');
 }
 
 function removeImageReferences(text, imageUrl) {
@@ -1038,13 +1040,14 @@ function removeImageReferences(text, imageUrl) {
     const rawUrlRegex = new RegExp(escapedUrl, 'gi');
     result = result.replace(rawUrlRegex, '');
 
-    result = result
-        .replace(/\bimage\s+url\s*:?/gi, '')
-        .replace(/\bimage\s+link\s*:?/gi, '')
-        .replace(/\bart(?:work)?\s+(?:url|link)\s*:?/gi, '')
-        .replace(/<\s*>/g, '')
-        .replace(/\(\s*\)/g, '')
-        .replace(/\?\[\s*\]/g, '');
+    result =
+        result
+            .replace(/\bimage\s+url\s*:?/gi, '')
+            .replace(/\bimage\s+link\s*:?/gi, '')
+            .replace(/\bart(?:work)?\s+(?:url|link)\s*:?/gi, '')
+            .replace(/<\s*>/g, '')
+            .replace(/\(\s*\)/g, '')
+            .replace(/\?\[\s*\]/g, '');
 
     return result
         .replace(/\n{3,}/g, '\n\n')
@@ -1066,8 +1069,8 @@ function parseAiDirectives(responseText) {
     let workingText = responseText;
 
     const patterns = [
-        /\?\[command:\s*([^\]]+)\]/gi,
-        /\{\{command:\s*([^}]+)\}\}/gi,
+        /\?\[command:\s*([^\\\]]+)\]/gi,
+        /\{\{command:\s*([^}]*)\}\}/gi,
         /<command[^>]*>\s*([^<]*)<\/command>/gi,
         /\bcommand\s*[:=]\s*([a-z0-9_\-]+)/gi,
         /\bcommands?\s*[:=]\s*([a-z0-9_\-]+)/gi,
