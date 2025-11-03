@@ -1,3 +1,28 @@
+function logToScreen(message) {
+    // Enhanced: write to inline #log-display if present, and to the debug overlay if enabled.
+    const logDisplay = document.getElementById('log-display');
+    if (logDisplay) {
+        logDisplay.innerHTML += message + '<br>';
+    }
+    // If the overlay exists (created below), mirror the message there too.
+    const overlay = document.getElementById('debug-overlay');
+    if (overlay) {
+        const line = document.createElement('div');
+        line.textContent = typeof message === 'string' ? message : String(message);
+        overlay.appendChild(line);
+        // Keep the overlay bounded
+        while (overlay.childNodes.length > 200) {
+            overlay.removeChild(overlay.firstChild);
+        }
+        overlay.scrollTop = overlay.scrollHeight;
+    }
+}
+
+/* =========================
+   Debug Overlay (added)
+   - Hidden by default
+   - Toggle with ` or ~
+   - Word wrap + scroll + capped lines
 const heroStage = document.getElementById('hero-stage');
 const heroImage = document.getElementById('hero-image');
 const muteIndicator = document.getElementById('mute-indicator');
@@ -29,6 +54,31 @@ let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
+
+const dependencyChecks = [
+    {
+        id: 'secure-context',
+        label: 'Secure context (HTTPS or localhost)',
+        check: () =>
+            Boolean(window.isSecureContext) ||
+            /^localhost$|^127(?:\.\d{1,3}){3}$|^[::1]$/.test(window.location.hostname)
+    },
+    {
+        id: 'speech-recognition',
+        label: 'Web Speech Recognition API',
+        check: () => Boolean(SpeechRecognition)
+    },
+    {
+        id: 'speech-synthesis',
+        label: 'Speech synthesis voices',
+        check: () => typeof synth !== 'undefined' && typeof synth.speak === 'function'
+    },
+    {
+        id: 'microphone',
+        label: 'Microphone access',
+        check: () => Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    }
+];
 
 if (heroStage && !heroStage.dataset.state) {
     heroStage.dataset.state = 'empty';
@@ -68,18 +118,12 @@ function resolveAssetPath(relativePath) {
     }
 }
 
-function loadScript(src) {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-    });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-    startApplication();
+    evaluateDependencies();
+
+    recheckButton?.addEventListener('click', () => {
+        evaluateDependencies({ announce: true });
+    });
 });
 
 window.addEventListener('focus', () => {
@@ -128,6 +172,7 @@ function normalizeLaunchResults(detail) {
 }
 
 async function handleTalkToUnityLaunch(detail) {
+    logToScreen('handleTalkToUnityLaunch: Beginning execution');
     const normalized = normalizeLaunchResults(detail);
 
     if (normalized) {
@@ -140,11 +185,14 @@ async function handleTalkToUnityLaunch(detail) {
         if (typeof window !== 'undefined') {
             delete window.__talkToUnityLaunchIntent;
         }
+        logToScreen('handleTalkToUnityLaunch: Already started, exiting');
         return;
     }
 
     try {
+        logToScreen('handleTalkToUnityLaunch: Starting application');
         await startApplication();
+        logToScreen('handleTalkToUnityLaunch: Application started successfully');
     } catch (error) {
         console.error('Failed to start the Talk to Unity experience:', error);
         appStarted = false;
@@ -156,100 +204,34 @@ async function handleTalkToUnityLaunch(detail) {
     }
 }
 
-window.addEventListener('talk-to-unity:launch', (event) => {
-    handleTalkToUnityLaunch(event?.detail).catch((error) => {
-        console.error('Error while handling Talk to Unity launch event:', error);
-    });
-});
-
-if (typeof window !== 'undefined' && window.__talkToUnityLaunchIntent) {
-    handleTalkToUnityLaunch(window.__talkToUnityLaunchIntent).catch((error) => {
-        console.error('Failed to honor pending Talk to Unity launch intent:', error);
-    });
-}
-
-function evaluateDependencies({ announce = false } = {}) {
-    const results = dependencyChecks.map((descriptor) => {
-        let met = false;
-        try {
-            met = Boolean(descriptor.check());
-        } catch (error) {
-            console.error(`Dependency check failed for ${descriptor.id}:`, error);
-        }
-
-        return {
-            ...descriptor,
-            met
-        };
-    });
-
-    const allMet = results.every((result) => result.met);
-    updateDependencyUI(results, allMet, { announce });
-
-    if (launchButton) {
-        launchButton.disabled = false;
-        launchButton.setAttribute('aria-disabled', 'false');
-    }
-
-    return { results, allMet };
-}
-
-function updateDependencyUI(results, allMet, { announce = false } = {}) {
-    if (dependencyList) {
-        results.forEach((result) => {
-            const item = dependencyList.querySelector(`[data-dependency="${result.id}"]`);
-            if (!item) {
-                return;
-            }
-
-            item.dataset.state = result.met ? 'pass' : 'fail';
-            const statusElement = item.querySelector('.dependency-status');
-            if (statusElement) {
-                statusElement.textContent = result.met ? 'Ready' : 'Action required';
-            }
-        });
-    }
-
-    if (dependencyLight) {
-        dependencyLight.dataset.state = allMet ? 'pass' : 'fail';
-        dependencyLight.setAttribute(
-            'aria-label',
-            allMet ? 'All dependencies satisfied' : 'One or more dependencies are missing'
-        );
-    }
-
-    if (dependencySummary) {
-        const unmet = results.filter((result) => !result.met);
-        if (unmet.length === 0) {
-            dependencySummary.textContent =
-                'All systems are ready. Launch the Voice Lab to begin your Unity AI conversation.';
-        } else if (unmet.length === 1) {
-            const [missingCapability] = unmet;
-            dependencySummary.textContent =
-                `${missingCapability.label} is unavailable. You can launch now, but some features may be limited until it is resolved.`;
-        } else {
-            const missingLabels = unmet.map((result) => result.label).join(', ');
-            dependencySummary.textContent =
-                `Multiple capabilities are unavailable (${missingLabels}). You can launch now, but some features may be limited until they are resolved.`;
-        }
-    }
-
-    if (announce && !allMet) {
-        const missingNames = results
-            .filter((result) => !result.met)
-            .map((result) => result.label)
-            .join(', ');
-
-        if (missingNames) {
-            speak(`Missing dependencies: ${missingNames}`);
-        }
-    }
-}
-
 async function startApplication() {
+    console.log('startApplication: Function called.');
+    logToScreen('startApplication: Beginning execution');
+    if (appStarted) {
+        logToScreen('startApplication: Already started, exiting');
+        return;
+    }
+
+    appStarted = true;
+
+    console.log('startApplication: Before DOM manipulation. appRoot hidden:', appRoot?.hasAttribute('hidden'), 'landingSection aria-hidden:', landingSection?.getAttribute('aria-hidden'), 'body appState:', bodyElement?.dataset.appState);
+
+    if (appRoot?.hasAttribute('hidden')) {
+        logToScreen('startApplication: Showing app root');
+        appRoot.removeAttribute('hidden');
+    }
+
     if (bodyElement) {
+        logToScreen('startApplication: Setting app state to experience');
         bodyElement.dataset.appState = 'experience';
     }
+
+    if (landingSection) {
+        logToScreen('startApplication: Hiding landing section');
+        landingSection.setAttribute('aria-hidden', 'true');
+    }
+
+    console.log('startApplication: After DOM manipulation. appRoot hidden:', appRoot?.hasAttribute('hidden'), 'landingSection aria-hidden:', landingSection?.getAttribute('aria-hidden'), 'body appState:', bodyElement?.dataset.appState);
 
     if (heroStage) {
         if (!heroStage.dataset.state) {
@@ -260,11 +242,15 @@ async function startApplication() {
 
     applyTheme(currentTheme);
     await loadSystemPrompt();
+    logToScreen('startApplication: Setting up speech recognition');
     await setupSpeechRecognition();
+    logToScreen('startApplication: Speech recognition setup complete');
     updateMuteIndicator();
     await initializeVoiceControl();
     applyTheme(currentTheme, { force: true });
+    logToScreen('startApplication: Execution complete');
 }
+window.startApplication = startApplication;
 
 async function setMutedState(muted, { announce = false } = {}) {
     if (!recognition) {
@@ -436,71 +422,93 @@ async function loadSystemPrompt() {
     }
 }
 
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
 async function setupSpeechRecognition() {
-    if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-    } else {
+    const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
+    if (isFirefox) {
         try {
-            if (loadingIndicator) loadingIndicator.hidden = false;
-            await loadScript('https://cdn.jsdelivr.net/npm/vosk-browser@0.0.5/dist/vosk.js');
-            const model = await Vosk.createModel('/vosk-model-small-en-us-0.15.zip');
-            recognition = new model.KaldiRecognizer();
-            if (loadingIndicator) loadingIndicator.hidden = true;
+            await loadScript('https://cdn.jsdelivr.net/npm/vosklet@0.2.1/dist/vosklet.umd.min.js');
+            // Keep original relative path used by your AI folder structure
+            await loadScript('AI/vosklet-adapter.js');
+            recognition = await createVoskletRecognizer(
+                (event) => { // onresult
+                    const transcript = event.results[event.results.length - 1][0].transcript.trim();
+                    console.log('User said (Vosklet):', transcript);
+                    setCircleState(userCircle, { listening: true, speaking: false, label: 'Processing what you said' });
+                    const isLocalCommand = handleVoiceCommand(transcript);
+                    if (!isLocalCommand) {
+                        getAIResponse(transcript);
+                    }
+                },
+                (event) => { // onerror
+                    console.error('Vosklet recognition error:', event.error);
+                    setCircleState(userCircle, { error: true, listening: false, speaking: false, label: `Microphone error: ${event.error}` });
+                }
+            );
         } catch (error) {
             console.error('Failed to load Vosklet:', error);
-            if (loadingIndicator) loadingIndicator.hidden = true;
-            alert('Failed to load speech recognition model. Please try again later.');
-            setCircleState(userCircle, {
-                label: 'Speech recognition model failed to load',
-                error: true
-            });
+            alert('Failed to load speech recognition module for Firefox.');
+            setCircleState(userCircle, { label: 'Speech recognition module failed to load', error: true });
             return;
         }
-    }
+    } else if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
 
-    recognition.continuous = true;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+        recognition.onresult = (event) => {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            console.log('User said:', transcript);
+            setCircleState(userCircle, { listening: true, speaking: false, label: 'Processing what you said' });
+            const isLocalCommand = handleVoiceCommand(transcript);
+            if (!isLocalCommand) {
+                getAIResponse(transcript);
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            setCircleState(userCircle, { error: true, listening: false, speaking: false, label: `Microphone error: ${event.error}` });
+        };
+    } else {
+        console.error('Speech recognition is not supported in this browser.');
+        alert('Speech recognition is not supported in this browser.');
+        setCircleState(userCircle, { label: 'Speech recognition is not supported in this browser', error: true });
+        return;
+    }
 
     recognition.onstart = () => {
         console.log('Voice recognition started.');
-        setCircleState(userCircle, {
-            listening: true,
-            label: 'Listening for your voice'
-        });
+        setCircleState(userCircle, { listening: true, label: 'Listening for your voice' });
     };
 
     recognition.onaudiostart = () => {
-        setCircleState(userCircle, {
-            listening: true,
-            label: 'Listening for your voice'
-        });
+        setCircleState(userCircle, { listening: true, label: 'Listening for your voice' });
     };
 
     recognition.onspeechstart = () => {
-        setCircleState(userCircle, {
-            speaking: true,
-            listening: true,
-            label: 'Hearing you speak'
-        });
+        setCircleState(userCircle, { speaking: true, listening: true, label: 'Hearing you speak' });
     };
 
     recognition.onspeechend = () => {
-        setCircleState(userCircle, {
-            listening: true,
-            speaking: false,
-            label: 'Processing what you said'
-        });
+        setCircleState(userCircle, { listening: true, speaking: false, label: 'Processing what you said' });
     };
 
     recognition.onend = () => {
         console.log('Voice recognition stopped.');
-        setCircleState(userCircle, {
-            listening: false,
-            speaking: false,
-            label: isMuted ? 'Microphone is muted' : 'Listening for your voice'
-        });
+        setCircleState(userCircle, { listening: false, speaking: false, label: isMuted ? 'Microphone is muted' : 'Listening for your voice' });
 
         if (recognitionRestartTimeout) {
             clearTimeout(recognitionRestartTimeout);
@@ -514,10 +522,7 @@ async function setupSpeechRecognition() {
                     recognition.start();
                 } catch (error) {
                     console.error('Failed to restart recognition:', error);
-                    setCircleState(userCircle, {
-                        error: true,
-                        label: 'Unable to restart microphone recognition'
-                    });
+                    setCircleState(userCircle, { error: true, label: 'Unable to restart microphone recognition' });
 
                     if (!isMuted) {
                         recognitionRestartTimeout = window.setTimeout(() => {
@@ -532,32 +537,6 @@ async function setupSpeechRecognition() {
                 }
             }, 280);
         }
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.trim();
-        console.log('User said:', transcript);
-
-        setCircleState(userCircle, {
-            listening: true,
-            speaking: false,
-            label: 'Processing what you said'
-        });
-
-        const isLocalCommand = handleVoiceCommand(transcript);
-        if (!isLocalCommand) {
-            getAIResponse(transcript);
-        }
-    };
-
-    recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setCircleState(userCircle, {
-            error: true,
-            listening: false,
-            speaking: false,
-            label: `Microphone error: ${event.error}`
-        });
     };
 }
 
@@ -700,10 +679,10 @@ function removeMarkdownLinkTargets(value) {
         .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, altText, url) => {
             return isLikelyUrlSegment(url) ? altText : _match;
         })
-        .replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_match, linkText, url) => {
+        .replace(/\ \[\[^\]]*\]\(([^)]+)\)/g, (_match, linkText, url) => {
             return isLikelyUrlSegment(url) ? linkText : _match;
         })
-        .replace(/\[(?:command|action)[^\]]*\]\([^)]*\)/gi, ' ');
+        .replace(/\ \[\[ (?:command|action)[^\\]*\]\([^)]*\)\]/gi, ' ');
 }
 
 function removeCommandArtifacts(value) {
@@ -712,15 +691,15 @@ function removeCommandArtifacts(value) {
     }
 
     let result = value
-        .replace(/\[[^\]]*\bcommand\b[^\]]*\]/gi, ' ')
-        .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
-        .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
-        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
-        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_,\s-]+/gi, ' ')
-        .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
-        .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
+        .replace(/\ \[\[ [^\\]*\\bcommand\\b[^\\]*\]/gi, ' ')
+        .replace(/\([^)]*\\bcommand\\b[^)]*\)/gi, ' ')
+        .replace(/<[^>]*\\bcommand\\b[^>]*>/gi, ' ')
+        .replace(/\\bcommands?\s*[:=-]\s*[a-z0-9_\\s-]+/gi, ' ')
+        .replace(/\\bactions?\s*[:=-]\s*[a-z0-9_\\s-]+/gi, ' ')
+        .replace(/\\b(?:execute|run)\\s+command\\s*(?:[:=-]\\s*)?[a-z0-9_-]*/gi, ' ')
+        .replace(/\\bcommand\\s*(?:[:=-]\\s*|\\s+)(?:[a-z0-9_-]+(?:\\s+[a-z0-9_-]+)*)?/gi, ' ');
 
-    result = result.replace(/^\s*[-*]?\s*(?:command|action)[^\n]*$/gim, ' ');
+    result = result.replace(/^\\s*[-*]?\\s*(?:command|action)[^\\n]*$/gim, ' ');
 
     return result;
 }
@@ -731,36 +710,35 @@ function sanitizeForSpeech(text) {
     }
 
     const withoutDirectives = text
-        .replace(/\[command:[^\]]*\]/gi, ' ')
+        .replace(/\ \[\[command:[^\\]*\]/gi, ' ')
         .replace(/\{command:[^}]*\}/gi, ' ')
         .replace(/<command[^>]*>[^<]*<\/command>/gi, ' ')
-        .replace(/\b(?:command|action)\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
-        .replace(/\bcommands?\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
-        .replace(/\b(?:command|action)\s*(?:->|=>|::)\s*([a-z0-9_\-]+)/gi, ' ')
-        .replace(/\b(?:command|action)\b\s*[()\-:=]*\s*[a-z0-9_\-]+/gi, ' ')
-        .replace(/\bcommand\s*\([^)]*\)/gi, ' ');
+        .replace(/\\b(?:command|action)\\s*[:=]\\s*([a-z0-9_\\-]+)/gi, ' ')
+        .replace(/\\bcommands?\s*[:=]\\s*([a-z0-9_\\-]+)/gi, ' ')
+        .replace(/\\b(?:command|action)\\s*(?:->|=>|::)\\s*([a-z0-9_\\-]+)/gi, ' ')
+        .replace(/\\bcommand\\s*\([^)]*\)/gi, ' ');
 
     const withoutPollinations = withoutDirectives
-        .replace(/https?:\/\/\S*images?\.pollinations\.ai\S*/gi, '')
-        .replace(/\b\S*images?\.pollinations\.ai\S*\b/gi, '');
+        .replace(/https?:\\/\\/\\S*images?.pollinations.ai\\S*/gi, '')
+        .replace(/\\b\\S*images?.pollinations.ai\\S*\\b/gi, '');
 
     const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
     const withoutCommands = removeCommandArtifacts(withoutMarkdownTargets);
 
     const withoutGenericUrls = withoutCommands
-        .replace(/https?:\/\/\S+/gi, ' ')
-        .replace(/\bwww\.[^\s)]+/gi, ' ');
+        .replace(/https?:\\/\\/\\S+/gi, ' ')
+        .replace(/\\bwww\\.[^\\s)]+/gi, ' ');
 
     const withoutSpacedUrls = withoutGenericUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*[\w\-./?%#&=]+/gi, ' ')
-        .replace(/\bhttps?\b/gi, ' ')
-        .replace(/\bwww\b/gi, ' ');
+        .replace(/h\\s*t\\s*t\\s*p\\s*s?\\s*:\\s*\\/\\/\\s*[\\w\\-./?%#&=]+/gi, ' ')
+        .replace(/\\bhttps?\\b/gi, ' ')
+        .replace(/\\bwww\\b/gi, ' ');
 
     const withoutSpelledUrls = withoutSpacedUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*(?:[:=]|colon)\s*\/\s*\/\s*[\w\-./?%#&=]+/gi, ' ')
-        .replace(/\b(?:h\s*t\s*t\s*p\s*s?|h\s*t\s*t\s*p)\b/gi, ' ')
-        .replace(/\bcolon\b/gi, ' ')
-        .replace(/\bslash\b/gi, ' ');
+        .replace(/h\\s*t\\s*t\\s*p\\s*s?\\s*(?:[:=]|colon)\\s*\\/\\/\\s*[\\w\\-./?%#&=]+/gi, ' ')
+        .replace(/\\b(?:h\\s*t\\s*t\\s*p\\s*s?|h\\s*t\\s*t\\s*p)\\b/gi, ' ')
+        .replace(/\\bcolon\\b/gi, ' ')
+        .replace(/\\bslash\\b/gi, ' ');
 
     const parts = withoutSpelledUrls.split(/(\s+)/);
     const sanitizedParts = parts.map((part) => {
@@ -768,15 +746,15 @@ function sanitizeForSpeech(text) {
             return '';
         }
 
-        if (/(?:https?|www|:\/\/|\.com|\.net|\.org|\.io|\.ai|\.co|\.gov|\.edu)/i.test(part)) {
+        if (/(?:https?|www|:\/\\/|\\.com|\\.net|\\.org|\\.io|\\.ai|\\.co|\\.gov|\\.edu)/i.test(part)) {
             return '';
         }
 
-        if (/\bcommand\b/i.test(part)) {
+        if (/\\bcommand\\b/i.test(part)) {
             return '';
         }
 
-        if (/(?:image|artwork|photo)\s+(?:url|link)/i.test(part)) {
+        if (/(?:image|artwork|photo)\\s+(?:url|link)/i.test(part)) {
             return '';
         }
 
@@ -801,18 +779,18 @@ function sanitizeForSpeech(text) {
 
     let sanitized = sanitizedParts
         .join('')
-        .replace(/\s{2,}/g, ' ')
-        .replace(/\s+([.,!?;:])/g, '$1')
+        .replace(/\\s{2,}/g, ' ')
+        .replace(/\\s+([.,!?;:])/g, '$1')
         .replace(/\(\s*\)/g, '')
-        .replace(/\[\s*\]/g, '')
+        .replace(/\\\[\\s*\]/g, '')
         .replace(/\{\s*\}/g, '')
-        .replace(/\b(?:https?|www)\b/gi, '')
-        .replace(/\b[a-z0-9]+\s+dot\s+[a-z0-9]+\b/gi, '')
-        .replace(/\b(?:dot\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\b/gi, '')
+        .replace(/\\b(?:https?|www)\\b/gi, '')
+        .replace(/\\b[a-z0-9]+\\s+dot\\s+[a-z0-9]+\\b/gi, '')
+        .replace(/\\b(?:dot\\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\\b/gi, '')
 
         .replace(/<\s*>/g, '')
-        .replace(/\bcommand\b/gi, '')
-        .replace(/\b(?:image|artwork|photo)\s+(?:url|link)\b.*$/gim, '')
+        .replace(/\\bcommand\\b/gi, '')
+        .replace(/\\b(?:image|artwork|photo)\\s+(?:url|link)\\b.*$/gim, '')
         .trim();
 
     return sanitized;
@@ -825,9 +803,9 @@ function sanitizeImageUrl(rawUrl) {
 
     return rawUrl
         .trim()
-        .replace(/^["'<\[({]+/, '')
-        .replace(/["'>)\]}]+$/, '')
-        .replace(/[,.;!]+$/, '');
+        .replace(/^["'<\\\\[({]+/g, '')
+        .replace(/["'>)\]}]+$/g, '')
+        .replace(/[,.;!]+$/g, '');
 }
 
 const FALLBACK_IMAGE_KEYWORDS = [
@@ -860,14 +838,14 @@ function shouldRequestFallbackImage({ userInput = '', assistantMessage = '', fal
         return true;
     }
 
-    const descriptiveCuePattern = /(here\s+(?:is|'s)|displaying|showing)\s+(?:an?\s+)?(?:image|picture|photo|visual)/i;
+    const descriptiveCuePattern = /(here\s+(?:is|'s)|displaying|showing)\\s+(?:an?\s+)?(?:image|picture|photo|visual)/i;
     return descriptiveCuePattern.test(combined);
 }
 
 function cleanFallbackPrompt(text) {
     return text
-        .replace(/^["'\s]+/, '')
-        .replace(/["'\s]+$/, '')
+        .replace(/^["\'​\s]+/g, '')
+        .replace(/["\'​\s]+$/g, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
 }
@@ -895,14 +873,14 @@ function buildFallbackImagePrompt(userInput = '', assistantMessage = '') {
 
     const cleaned = cleanFallbackPrompt(
         rawCandidate
-            .replace(/\b(?:please|kindly)\b/gi, '')
-            .replace(/\b(?:can|could|would|will|may|might|let's)\b\s+(?:you\s+)?/gi, '')
+            .replace(/\\b(?:please|kindly)\\b/gi, '')
+            .replace(/\\b(?:can|could|would|will|may|might|let's)\\b\\s+(?:you\\s+)?/gi, '')
             .replace(
-                /\b(?:show|display|draw|paint|generate|create|make|produce|render|give|find|display)\b\s+(?:me\s+|us\s+)?/gi,
+                /\\b(?:show|display|draw|paint|generate|create|make|produce|render|give|find|display)\\b\\s+(?:me\\s+|us\\s+)?/gi,
                 ''
             )
             .replace(
-                /\b(?:an?\s+)?(?:image|picture|photo|visual|illustration|render|drawing|art|shot|wallpaper)\b\s*(?:of|showing)?\s*/gi,
+                /\\b(?:an?\s+)?(?:image|picture|photo|visual|illustration|render|drawing|art|shot|wallpaper)\\b\\s*(?:of|showing)?\\s*/gi,
                 ''
             )
     );
@@ -946,7 +924,7 @@ function extractImageUrl(text) {
         return sanitizeImageUrl(markdownMatch[1]);
     }
 
-    const urlMatch = text.match(/https?:\/\/[^\s)]+/i);
+    const urlMatch = text.match(/https?:\/\/[^)\s]+/i);
     if (urlMatch && urlMatch[0]) {
         return sanitizeImageUrl(urlMatch[0]);
     }
@@ -955,7 +933,7 @@ function extractImageUrl(text) {
 }
 
 function escapeRegExp(value) {
-    return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return value.replace(/[-/\\^$*+?.()|[\\]{}]/g, '\\$&');
 }
 
 function removeImageReferences(text, imageUrl) {
@@ -975,27 +953,27 @@ function removeImageReferences(text, imageUrl) {
     let result = text;
     const escapedUrl = escapeRegExp(sanitizedUrl);
 
-    const markdownImageRegex = new RegExp(`!\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'gi');
+    const markdownImageRegex = new RegExp(`!\[[^\]]*\]\(${escapedUrl}\)`, 'gi');
     result = result.replace(markdownImageRegex, '');
 
-    const markdownLinkRegex = new RegExp(`\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'gi');
+    const markdownLinkRegex = new RegExp(`\[[^\]]*\]\(${escapedUrl}\)`, 'gi');
     result = result.replace(markdownLinkRegex, '');
 
     const rawUrlRegex = new RegExp(escapedUrl, 'gi');
     result = result.replace(rawUrlRegex, '');
 
     result = result
-        .replace(/\bimage\s+url\s*:?/gi, '')
-        .replace(/\bimage\s+link\s*:?/gi, '')
-        .replace(/\bart(?:work)?\s+(?:url|link)\s*:?/gi, '')
+        .replace(/\\bimage\\s+url\\s*:?/gi, '')
+        .replace(/\\bimage\\s+link\\s*:?/gi, '')
+        .replace(/\\bart(?:work)?\\s+(?:url|link)\\s*:?/gi, '')
         .replace(/<\s*>/g, '')
         .replace(/\(\s*\)/g, '')
-        .replace(/\[\s*\]/g, '');
+        .replace(/\\\[\\s*\]/g, '');
 
     return result
-        .replace(/\n{3,}/g, '\n\n')
+        .replace(/\\n{3,}/g, '\\n\\n')
         .replace(/[ \t]{2,}/g, ' ')
-        .replace(/\s+([.,!?;:])/g, '$1')
+        .replace(/\\s+([.,!?;:])/g, '$1')
         .trim();
 }
 
@@ -1012,14 +990,14 @@ function parseAiDirectives(responseText) {
     let workingText = responseText;
 
     const patterns = [
-        /\[command:\s*([^\]]+)\]/gi,
-        /\{command:\s*([^}]+)\}/gi,
+        /\ \[\[command:\s*([^\\]+)\]/gi,
+        /\{command:\s*([^}]*)\}/gi,
         /<command[^>]*>\s*([^<]*)<\/command>/gi,
-        /\bcommand\s*[:=]\s*([a-z0-9_\-]+)/gi,
-        /\bcommands?\s*[:=]\s*([a-z0-9_\-]+)/gi,
-        /\baction\s*[:=]\s*([a-z0-9_\-]+)/gi,
-        /\b(?:command|action)\s*(?:->|=>|::)\s*([a-z0-9_\-]+)/gi,
-        /\bcommand\s*\(\s*([^)]+?)\s*\)/gi
+        /\\bcommand\\s*[:=]\s*([a-z0-9_\\-]+)/gi,
+        /\\bcommands?\s*[:=]\s*([a-z0-9_\\-]+)/gi,
+        /\\baction\s*[:=]\s*([a-z0-9_\\-]+)/gi,
+        /\\b(?:command|action)\\s*(?:->|=>|::)\\s*([a-z0-9_\\-]+)/gi,
+        /\\bcommand\\s*\(\s*([^)]+?)\s*\)/gi
     ];
 
     for (const pattern of patterns) {
@@ -1034,7 +1012,7 @@ function parseAiDirectives(responseText) {
         });
     }
 
-    const slashCommandRegex = /(?:^|\s)\/(open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\b/gi;
+    const slashCommandRegex = /(?:^|\s)\/ (open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\\b/gi;
     workingText = workingText.replace(slashCommandRegex, (_match, commandValue) => {
         const normalized = normalizeCommandValue(commandValue);
         if (normalized) {
@@ -1043,10 +1021,10 @@ function parseAiDirectives(responseText) {
         return ' ';
     });
 
-    const directiveBlockRegex = /(?:^|\n)\s*(?:commands?|actions?)\s*:?\s*(?:\n|$)((?:\s*[-*•]?\s*[a-z0-9_\-]+\s*(?:\(\))?\s*(?:\n|$))+)/gi;
+    const directiveBlockRegex = /(?:^|\\n)\\s*(?:commands?|actions?)\\s*:?\\s*(?:\\n|$ )((?:\\s*[-*•]?\\s*[a-z0-9_\\-]+\\s*(?:\\(\\))?\\s*(?:\\n|$))+)/gi;
     workingText = workingText.replace(directiveBlockRegex, (_match, blockContent) => {
         const lines = blockContent
-            .split(/\n+/)
+            .split(/\\n+/) // Split by one or more newlines
             .map((line) => line.replace(/^[^a-z0-9]+/i, '').trim())
             .filter(Boolean);
 
@@ -1057,10 +1035,10 @@ function parseAiDirectives(responseText) {
             }
         }
 
-        return '\n';
+        return '\\n';
     });
 
-    const cleanedText = workingText.replace(/\n{3,}/g, '\n\n').trim();
+    const cleanedText = workingText.replace(/\\n{3,}/g, '\\n\\n').trim();
     const uniqueCommands = [...new Set(commands)];
 
     return { cleanedText, commands: uniqueCommands };
@@ -1373,7 +1351,7 @@ async function getAIResponse(userInput) {
             ? removeImageReferences(assistantMessage, selectedImageUrl)
             : assistantMessage;
 
-        const finalAssistantMessage = assistantMessageWithoutImage.replace(/\n{3,}/g, '\n\n').trim();
+        const finalAssistantMessage = assistantMessageWithoutImage.replace(/\\n{3,}/g, '\\n\\n').trim();
         const chatAssistantMessage = finalAssistantMessage || '[image]';
 
         chatHistory.push({ role: 'assistant', content: chatAssistantMessage });
@@ -1544,3 +1522,42 @@ function openImageInNewTab(imageUrlOverride) {
     window.open(imageUrl, '_blank');
     speak('Image opened in new tab.');
 }
+
+if (!launchButton && !landingSection) {
+    startApplication().catch((error) => {
+        console.error('Failed to auto-start the Unity voice experience:', error);
+    });
+}
+
+if (typeof window !== 'undefined') {
+    const setMutedStateHandler = setMutedState;
+    window.setMutedState = (muted, options) => setMutedStateHandler(muted, options);
+
+    Object.defineProperty(window, '__unityTestHooks', {
+        value: {
+            isAppReady: () => appStarted,
+            getChatHistory: () => chatHistory.map((entry) => ({ ...entry })),
+            getCurrentHeroImage: () => getImageUrl(),
+            setHeroImage: (dataUrl) => updateHeroImage(dataUrl),
+            sendUserInput: async (input) => {
+                if (typeof input !== 'string' || !input.trim()) {
+                    return { error: new Error('Input must be a non-empty string.') };
+                }
+
+                if (!appStarted) {
+                    await startApplication();
+                }
+
+                return getAIResponse(input.trim());
+            }
+        },
+        configurable: true,
+        enumerable: false
+    });
+}
+
+window.addEventListener('talk-to-unity:launch', () => {
+    startApplication();
+});
+
+// NOTE: removed the duplicate 'talk-to-unity:launch' listener that was previously included.

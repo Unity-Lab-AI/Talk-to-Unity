@@ -10,6 +10,11 @@
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Roboto+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
     />
+    <style>
+        body { visibility: hidden; }
+    </style>
+    <link rel="stylesheet" href="style.css?v=20240606" />
+    <link rel="stylesheet" href="AI/style.css" />
     <script>
         (function () {
             try {
@@ -27,83 +32,19 @@
                 console.warn('Failed to normalize trailing slash for assets:', error);
             }
         })();
+
+        window.addEventListener('load', function() {
+            document.body.style.visibility = 'visible';
+        });
     </script>
-    <script>
-        (function loadTalkToUnityAssets() {
-            const VERSION = '20240606';
-
-            function normalizeBasePath() {
-                try {
-                    const url = new URL(window.location.href);
-                    let { pathname } = url;
-
-                    if (!pathname.endsWith('/')) {
-                        const lastSegment = pathname.substring(pathname.lastIndexOf('/') + 1);
-                        if (!lastSegment || lastSegment.indexOf('.') === -1) {
-                            pathname += '/';
-                        } else {
-                            pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
-                        }
-                    }
-
-                    return `${url.origin}${pathname}`;
-                } catch (error) {
-                    console.warn('Unable to determine asset base path, falling back to relative paths.', error);
-                    return '';
-                }
-            }
-
-            function ensureTrailingSlash(value) {
-                if (typeof value !== 'string' || !value) {
-                    return '';
-                }
-                return value.endsWith('/') ? value : `${value}/`;
-            }
-
-            const inferredBase = ensureTrailingSlash(normalizeBasePath());
-            const assetBase = ensureTrailingSlash(
-                typeof window.__talkToUnityAssetBase === 'string' && window.__talkToUnityAssetBase
-                    ? window.__talkToUnityAssetBase
-                    : inferredBase
-            );
-
-            window.__talkToUnityAssetBase = assetBase;
-            if (!window.__talkToUnityAssetVersion) {
-                window.__talkToUnityAssetVersion = VERSION;
-            }
-
-            function resolveAsset(path) {
-                try {
-                    return new URL(path, assetBase || window.location.href).toString();
-                } catch (error) {
-                    console.warn('Falling back to relative asset path for', path, error);
-                    return path;
-                }
-            }
-
-            function appendStylesheet(path) {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = resolveAsset(path);
-                document.head.appendChild(link);
-            }
-
-            function appendScript(path) {
-                const script = document.createElement('script');
-                script.defer = true;
-                script.src = resolveAsset(path);
-                document.head.appendChild(script);
-            }
-
-            appendStylesheet(`style.css?v=${VERSION}`);
-            appendScript(`landing.js?v=${VERSION}`);
-        })();
-    </script>
+    <script src="landing.js?v=20240606" defer></script>
+    <script src="AI/app.js" defer></script>
     <noscript>
         <link rel="stylesheet" href="./style.css?v=20240606" />
     </noscript>
 </head>
 <body class="no-js" data-app-state="landing">
+    <div id="log-display" style="position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; z-index: 9999; font-family: monospace; max-width: 80%;"></div>
     <noscript>
         <div class="no-js-banner" role="alert">
             <strong>JavaScript is disabled.</strong>
@@ -144,9 +85,113 @@
                             </p>
                         </div>
                     </div>
+
+                    <ul id="dependency-list" class="dependency-list">
+                        <li
+                            class="dependency-item"
+                            data-dependency="secure-context"
+                            data-state="pending"
+                            data-pass-status="Ready — secure and private"
+                            data-fail-status="Fix: Use HTTPS or localhost"
+                        >
+                            <div class="dependency-header">
+                                <span class="dependency-name">Secure connection (HTTPS or localhost)</span>
+                                <span class="dependency-status">Checking…</span>
+                            </div>
+                            <p class="dependency-message" data-message-type="pass">
+                                Secure connection detected. Unity can safely access the microphone and speech features.
+                            </p>
+                            <p class="dependency-message" data-message-type="fail">
+                                Open this page with <code>https://</code> or from <code>localhost</code>, then press “Check again.”
+                            </p>
+                        </li>
+                        <li
+                            class="dependency-item"
+                            data-dependency="speech-recognition"
+                            data-state="pending"
+                            data-pass-status="Ready — Unity can listen"
+                            data-fail-status="Ready — Vosklet fallback"
+                        >
+                            <div class="dependency-header">
+                                <span class="dependency-name">Web Speech Recognition API</span>
+                                <span class="dependency-status">Checking…</span>
+                            </div>
+                            <p class="dependency-message" data-message-type="pass">
+                                Speech recognition is available. Unity will understand what you say.
+                            </p>
+                                                            <p class="dependency-message" data-message-type="fail">
+                                                                Firefox is supported via the Vosklet fallback library.
+                                                            </p>                        </li>
+                        <li
+                            class="dependency-item"
+                            data-dependency="speech-synthesis"
+                            data-state="pending"
+                            data-pass-status="Ready — Unity can speak back"
+                            data-fail-status="Fix: Enable browser speech voices"
+                        >
+                            <div class="dependency-header">
+                                <span class="dependency-name">Speech synthesis voices</span>
+                                <span class="dependency-status">Checking…</span>
+                            </div>
+                            <p class="dependency-message" data-message-type="pass">
+                                Speech voices are ready. Unity can answer out loud through your speakers.
+                            </p>
+                            <p class="dependency-message" data-message-type="fail">
+                                Use Chrome, Edge, or Safari with audio enabled, then press “Check again.”
+                            </p>
+                        </li>
+                        <li
+                            class="dependency-item"
+                            data-dependency="microphone"
+                            data-state="pending"
+                            data-pass-status="Ready — Microphone unlocked"
+                            data-fail-status="Fix: Allow microphone access"
+                        >
+                            <div class="dependency-header">
+                                <span class="dependency-name">Microphone access</span>
+                                <span class="dependency-status">Checking…</span>
+                            </div>
+                            <p class="dependency-message" data-message-type="pass">
+                                Microphone permission granted. Unity can hear your voice input.
+                            </p>
+                            <p class="dependency-message" data-message-type="fail">
+                                Click “Allow” on the microphone prompt or enable it in site settings, then press “Check again.”
+                            </p>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
+
+        <div class="landing-instructions surface-card" aria-labelledby="landing-how-to-title">
+            <h2 id="landing-how-to-title">How to get every light to glow green</h2>
+            <ol class="landing-steps">
+                <li>
+                    <strong>Stay on a secure connection.</strong> Always load <code>https://unityailab.com/Talk-to-Unity/</code> or run the site from
+                    <code>localhost</code> while developing. If you see <code>http://</code> in the address bar, add the missing “s” or jump back to the
+                    Unity AI Lab home page and enter from there.
+                </li>
+                <li>
+                    <strong>Use a browser that can listen.</strong> We recommend the latest Chrome or Edge. Safari works on macOS.
+                </li>
+                <li>
+                    <strong>Give Unity a voice and ears.</strong> Turn your speakers on, set your system output to the right device, and when the browser asks
+                    for microphone access, click <em>Allow</em>. You can also review these permissions via the lock icon near the URL bar.
+                </li>
+                <li>
+                    <strong>Re-run the check.</strong> Once you’ve made changes, press “Check again.” When every status reads “Ready,” the “Talk to Unity” button below
+                    will unlock and slide the live lab into view on this page.
+                </li>
+                <li>
+                    <strong>Remember the unmute cue.</strong> When the lab loads, <em>Tap or click anywhere to unmute</em> so Unity can hear you and respond.
+                </li>
+            </ol>
+            <p>
+                Need help? Refresh the page to start over, or read the tips above each alert. When everything looks good, we’ll send you forward
+                to the interactive Unity assistant.
+            </p>
+        </div>
+
         <div class="landing-actions surface-card action-bar">
             <a id="launch-app" class="primary" href="AI">Talk to Unity</a>
         </div>
