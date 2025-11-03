@@ -10,6 +10,11 @@
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Roboto+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
     />
+    <style>
+        body { visibility: hidden; }
+    </style>
+    <link rel="stylesheet" href="style.css?v=20240606" />
+    <link rel="stylesheet" href="AI/style.css" />
     <script>
         (function () {
             try {
@@ -27,86 +32,20 @@
                 console.warn('Failed to normalize trailing slash for assets:', error);
             }
         })();
+
+        window.addEventListener('load', function() {
+            document.body.style.visibility = 'visible';
+        });
     </script>
-    <script>
-        (function loadTalkToUnityAssets() {
-            const VERSION = '20240606';
-
-            function normalizeBasePath() {
-                try {
-                    const url = new URL(window.location.href);
-                    let { pathname } = url;
-
-                    if (!pathname.endsWith('/')) {
-                        const lastSegment = pathname.substring(pathname.lastIndexOf('/') + 1);
-                        if (!lastSegment || lastSegment.indexOf('.') === -1) {
-                            pathname += '/';
-                        } else {
-                            pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
-                        }
-                    }
-
-                    return `${url.origin}${pathname}`;
-                } catch (error) {
-                    console.warn('Unable to determine asset base path, falling back to relative paths.', error);
-                    return '';
-                }
-            }
-
-            function ensureTrailingSlash(value) {
-                if (typeof value !== 'string' || !value) {
-                    return '';
-                }
-                return value.endsWith('/') ? value : `${value}/`;
-            }
-
-            const inferredBase = ensureTrailingSlash(normalizeBasePath());
-            const assetBase = ensureTrailingSlash(
-                typeof window.__talkToUnityAssetBase === 'string' && window.__talkToUnityAssetBase
-                    ? window.__talkToUnityAssetBase
-                    : inferredBase
-            );
-
-            window.__talkToUnityAssetBase = assetBase;
-            if (!window.__talkToUnityAssetVersion) {
-                window.__talkToUnityAssetVersion = VERSION;
-            }
-
-            function resolveAsset(path) {
-                try {
-                    return new URL(path, assetBase || window.location.href).toString();
-                } catch (error) {
-                    console.warn('Falling back to relative asset path for', path, error);
-                    return path;
-                }
-            }
-
-            function appendStylesheet(path) {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = resolveAsset(path);
-                document.head.appendChild(link);
-            }
-
-            function appendScript(path) {
-                const script = document.createElement('script');
-                script.defer = true;
-                script.src = resolveAsset(path);
-                document.head.appendChild(script);
-            }
-
-            appendStylesheet(`style.css?v=${VERSION}`);
-            appendStylesheet('AI/style.css');
-            appendScript(`landing.js?v=${VERSION}`);
-            appendScript('AI/app.js');
-        })();
-    </script>
+    <script src="landing.js?v=20240606" defer></script>
+    <script src="AI/app.js" defer></script>
     <noscript>
         <link rel="stylesheet" href="./style.css?v=20240606" />
         <link rel="stylesheet" href="./AI/style.css" />
     </noscript>
 </head>
 <body class="no-js" data-app-state="landing">
+    <div id="log-display" style="position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; z-index: 9999; font-family: monospace; max-width: 80%;"></div>
     <noscript>
         <div class="no-js-banner" role="alert">
             <strong>JavaScript is disabled.</strong>
@@ -174,7 +113,7 @@
                             data-dependency="speech-recognition"
                             data-state="pending"
                             data-pass-status="Ready — Unity can listen"
-                            data-fail-status="Fix: Switch to a supported browser"
+                            data-fail-status="Ready — Vosklet fallback"
                         >
                             <div class="dependency-header">
                                 <span class="dependency-name">Web Speech Recognition API</span>
@@ -183,10 +122,9 @@
                             <p class="dependency-message" data-message-type="pass">
                                 Speech recognition is available. Unity will understand what you say.
                             </p>
-                            <p class="dependency-message" data-message-type="fail">
-                                Open this page in the latest Chrome or Edge, then press “Check again.”
-                            </p>
-                        </li>
+                                                            <p class="dependency-message" data-message-type="fail">
+                                                                Firefox is supported via the Vosklet fallback library.
+                                                            </p>                        </li>
                         <li
                             class="dependency-item"
                             data-dependency="speech-synthesis"
@@ -237,8 +175,7 @@
                     Unity AI Lab home page and enter from there.
                 </li>
                 <li>
-                    <strong>Use a browser that can listen.</strong> We recommend the latest Chrome or Edge. Safari works on macOS. Firefox is not
-                    supported in this release because it does not support the speech APIs we rely on.
+                    <strong>Use a browser that can listen.</strong> We recommend the latest Chrome or Edge. Safari works on macOS.
                 </li>
                 <li>
                     <strong>Give Unity a voice and ears.</strong> Turn your speakers on, set your system output to the right device, and when the browser asks

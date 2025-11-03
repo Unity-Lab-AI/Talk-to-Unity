@@ -22,7 +22,11 @@
             id: 'speech-recognition',
             label: 'Web Speech Recognition API',
             friendlyName: 'speech listening light',
-            check: () => Boolean(SpeechRecognition)
+            check: () => {
+                const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+                // Firefox is supported via the Vosklet fallback
+                return Boolean(SpeechRecognition) || isFirefox;
+            }
         },
         {
             id: 'speech-synthesis',
@@ -135,13 +139,23 @@
             return;
         }
 
-        const { allMet, missing, results } = result;
+        const { allMet } = result;
 
-        window.dispatchEvent(
-            new CustomEvent('talk-to-unity:launch', {
-                detail: { allMet, missing, results }
-            })
-        );
+        if (allMet) {
+            if (typeof window.startApplication === 'function') {
+                window.startApplication();
+            } else {
+                console.error('startApplication function not found on window object. Cannot launch AI experience.');
+                setStatusMessage('Failed to launch AI experience. Please check console for errors.', 'error');
+            }
+        } else {
+            // If not all dependencies are met, just update the UI with the status message
+            const summary = formatDependencyList(result.missing);
+            const message = summary
+                ? `Some browser features are unavailable: ${summary}. Please fix these before launching.`
+                : 'Some browser features are unavailable. Please fix these before launching.';
+            setStatusMessage(message, 'warning');
+        }
     }
 
     function handleRecheckClick() {
@@ -200,53 +214,7 @@
         }
     }
 
-    function handleLaunchEvent(event) {
-        const detail = event?.detail ?? {};
-        const { allMet = false, missing = [] } = detail;
 
-        if (typeof window !== 'undefined') {
-            window.__talkToUnityLaunchIntent = detail;
-        }
-
-        const summary = formatDependencyList(missing);
-        const tone = allMet ? 'success' : 'warning';
-        const launchMessage = allMet
-            ? 'All systems look good. Launching Talk to Unity…'
-            : summary
-            ? `Launching Talk to Unity. Some features may be limited until we resolve: ${summary}.`
-            : 'Launching Talk to Unity. Some features may be limited because certain capabilities are unavailable.';
-
-        setStatusMessage(launchMessage, tone);
-
-        document.cookie = 'checks-passed=true;path=/';
-
-        if (!allMet) {
-            dependencyLight?.setAttribute(
-                'aria-label',
-                summary
-                    ? `Launching with limited functionality while we address: ${summary}`
-                    : 'Launching with limited functionality while some requirements are addressed'
-            );
-        } else {
-            dependencyLight?.setAttribute('aria-label', 'All dependencies satisfied. Launching Talk to Unity');
-        }
-
-        if (launchButton) {
-            launchButton.disabled = true;
-            launchButton.setAttribute('aria-disabled', 'true');
-            launchButton.dataset.state = 'pending';
-        }
-
-        const appRoot = document.getElementById('app-root');
-        if (!appRoot) {
-            const launchUrl = resolveAppLaunchUrl();
-            if (launchUrl) {
-                window.location.assign(launchUrl);
-            }
-        }
-    }
-
-    window.addEventListener('talk-to-unity:launch', handleLaunchEvent);
 
     window.addEventListener('focus', () => {
         evaluateDependencies();
