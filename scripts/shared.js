@@ -222,6 +222,7 @@ window.initializeSharedDependencies = function() {
     recheckButton?.addEventListener('click', () => {
         window.evaluateDependencies({ announce: true });
     });
+    window.launchButton?.addEventListener('click', window.handleLaunchButtonClick);
     window.addEventListener('focus', () => {
         if (!window.appStarted) {
             window.evaluateDependencies();
