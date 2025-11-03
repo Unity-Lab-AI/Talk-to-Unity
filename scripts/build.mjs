@@ -66,8 +66,19 @@ async function finalizeDist() {
 async function build() {
     await prepareDistDirectory();
     await copyApplicationAssets();
+    await processHtmlFiles();
     await finalizeDist();
     console.log('Static site ready in dist/.');
+}
+
+async function processHtmlFiles() {
+    const aiIndexPath = path.join(distDir, 'AI', 'index.html');
+    let aiIndexContent = fs.readFileSync(aiIndexPath, 'utf8');
+    aiIndexContent = aiIndexContent.replace(
+        '<link rel="stylesheet" href="./style.css">',
+        '<link rel="stylesheet" href="../style.css">'
+    );
+    await writeFile(aiIndexPath, aiIndexContent, 'utf8');
 }
 
 build().catch((error) => {
