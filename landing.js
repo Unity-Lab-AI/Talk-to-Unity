@@ -120,5 +120,9 @@
 
     window.addEventListener('talk-to-unity:launch', handleLaunchEvent);
 
+    if (window.launchButton) {
+        window.launchButton.addEventListener('click', window.handleLaunchButtonClick);
+    }
+
     
     })();
