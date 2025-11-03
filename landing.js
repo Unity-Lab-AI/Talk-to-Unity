@@ -43,6 +43,20 @@
     ];
 
     let landingInitialized = false;
+    const dependencyOverrides = new Map();
+
+    function clearDependencyOverrides() {
+        dependencyOverrides.clear();
+    }
+
+    function setDependencyOverride(id, met) {
+        if (!id) return;
+        dependencyOverrides.set(id, Boolean(met));
+    }
+
+    function getDependencyOverride(id) {
+        return dependencyOverrides.has(id) ? dependencyOverrides.get(id) : undefined;
+    }
 
     function formatDependencyList(items) {
         const labels = items.map((item) => item.friendlyName ?? item.label ?? item.id).filter(Boolean);
@@ -208,10 +222,14 @@
     function evaluateDependencies({ announce = false } = {}) {
         const results = dependencyChecks.map((descriptor) => {
             let met = false;
-            try {
-                met = Boolean(descriptor.check());
-            } catch (error) {
-                console.error(`Dependency check failed for ${descriptor.id}:`, error);
+            const override = getDependencyOverride(descriptor.id);
+            if (typeof override !== 'undefined') met = Boolean(override);
+            else {
+                try {
+                    met = Boolean(descriptor.check());
+                } catch (error) {
+                    console.error(`Dependency check failed for ${descriptor.id}:`, error);
+                }
             }
             return { ...descriptor, met };
         });
@@ -273,4 +291,39 @@
 
         if (!announce && !allMet) setStatusMessage('');
     }
+
+    function createLandingTestHooks() {
+        if (typeof window === 'undefined') return;
+        const hooks = {
+            initialize() {
+                clearDependencyOverrides();
+                bootstrapLandingExperience();
+                return evaluateDependencies();
+            },
+            evaluateDependencies(options) {
+                return evaluateDependencies(options);
+            },
+            markAllDependenciesReady() {
+                dependencyChecks.forEach((descriptor) => setDependencyOverride(descriptor.id, true));
+                return evaluateDependencies({ announce: true });
+            },
+            setDependencyState(id, met) {
+                if (!id) return null;
+                setDependencyOverride(id, met);
+                return evaluateDependencies({ announce: true });
+            },
+            resetOverrides() {
+                clearDependencyOverrides();
+                return evaluateDependencies();
+            }
+        };
+
+        Object.defineProperty(window, '__unityLandingTestHooks', {
+            value: hooks,
+            configurable: true,
+            enumerable: false
+        });
+    }
+
+    createLandingTestHooks();
 })();
