@@ -17,5 +17,9 @@ module.exports = defineConfig({
         port: 4173,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000
-    }
+    },
+    reporter: [
+        ['junit', { outputFile: 'playwright-report/results.xml' }],
+        ['line']
+    ]
 });
