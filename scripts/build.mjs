@@ -53,6 +53,12 @@ async function copyApplicationAssets() {
         await copyStaticEntry(entry);
     }
 
+    // Copy scripts directory
+    const scriptsSourceDir = path.join(projectRoot, 'scripts');
+    const scriptsDestDir = path.join(distDir, 'scripts');
+    await mkdir(scriptsDestDir, { recursive: true });
+    await cp(path.join(scriptsSourceDir, 'shared.js'), path.join(scriptsDestDir, 'shared.js'));
+
     await cp(aiSourceDir, path.join(distDir, 'AI'), {
         recursive: true,
         filter: (source) => shouldCopyAiEntry(source)
