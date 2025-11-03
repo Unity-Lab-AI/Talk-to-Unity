@@ -120,6 +120,15 @@
     }
 
     function resolveAppLaunchUrl() {
+        const explicitLaunchHref = launchButton?.getAttribute('data-launch-url') || launchButton?.getAttribute('href');
+        if (explicitLaunchHref) {
+            try {
+                return new URL(explicitLaunchHref, window.location.href).toString();
+            } catch (error) {
+                console.warn('Failed to resolve launch URL from link element. Falling back to computed base.', error);
+            }
+        }
+
         const configuredBase =
             typeof window.__talkToUnityAssetBase === 'string' && window.__talkToUnityAssetBase
                 ? window.__talkToUnityAssetBase
@@ -128,18 +137,36 @@
 
         if (!base) {
             try {
-                base = ensureTrailingSlash(new URL('.', window.location.href).toString());
+                base = ensureTrailingSlash(new URL('./', window.location.href).toString());
             } catch (error) {
                 console.warn('Unable to determine Talk to Unity base path. Falling back to relative navigation.', error);
                 base = '';
             }
         }
 
+        const fallbackPath = './AI/index.html';
+
         try {
-            return new URL('./AI/index.html', base || window.location.href).toString();
+            return new URL(fallbackPath, base || window.location.href).toString();
         } catch (error) {
             console.warn('Failed to resolve Talk to Unity application URL. Using a relative fallback.', error);
-            return './AI/index.html';
+            return fallbackPath;
+        }
+    }
+
+    function syncLaunchButtonHref() {
+        if (!launchButton) return;
+        const resolvedHref = resolveAppLaunchUrl();
+        if (!resolvedHref) return;
+
+        try {
+            const currentHref = launchButton.href;
+            if (currentHref !== resolvedHref) {
+                launchButton.href = resolvedHref;
+            }
+        } catch (error) {
+            console.warn('Failed to sync launch button href. Using attribute fallback.', error);
+            launchButton.setAttribute('href', resolvedHref);
         }
     }
 
@@ -184,7 +211,8 @@
             appRoot.removeAttribute('hidden');
             document.body?.setAttribute('data-app-state', 'experience');
         } else {
-            const launchUrl = resolveAppLaunchUrl();
+            syncLaunchButtonHref();
+            const launchUrl = launchButton?.href || resolveAppLaunchUrl();
             if (launchUrl) {
                 window.location.href = launchUrl;
             }
@@ -289,6 +317,7 @@
         evaluateDependencies();
         launchButton?.addEventListener('click', handleLaunchButtonClick);
         recheckButton?.addEventListener('click', handleRecheckClick);
+        syncLaunchButtonHref();
     }
 
     document.addEventListener('DOMContentLoaded', bootstrapLandingExperience);
@@ -298,4 +327,14 @@
 
     window.addEventListener('talk-to-unity:launch', handleLaunchEvent);
     window.addEventListener('focus', () => evaluateDependencies());
+    window.addEventListener('load', () => {
+        evaluateDependencies();
+        syncLaunchButtonHref();
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            evaluateDependencies();
+            syncLaunchButtonHref();
+        }
+    });
 })();
