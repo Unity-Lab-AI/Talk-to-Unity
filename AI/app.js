@@ -114,7 +114,7 @@ let currentImageModel = 'flux';
 let chatHistory = [];
 let systemPrompt = '';
 let recognition = null;
-let isMuted = true;
+let isMuted = false;
 let hasMicPermission = false;
 let currentHeroUrl = '';
 let pendingHeroUrl = '';
@@ -151,43 +151,6 @@ const dependencyChecks = [
 
 if (heroStage && !heroStage.dataset.state) {
     heroStage.dataset.state = 'empty';
-}
-
-function evaluateDependencies({ announce = false } = {}) {
-    if (typeof window !== 'undefined') {
-        const delegate = window.__unityLandingTestHooks?.evaluateDependencies;
-        if (typeof delegate === 'function') {
-            try {
-                return delegate.call(window.__unityLandingTestHooks, { announce });
-            } catch (error) {
-                console.warn('Delegated dependency evaluation failed. Falling back to local checks.', error);
-            }
-        }
-    }
-
-    const results = dependencyChecks.map((descriptor) => {
-        let met = false;
-        try {
-            met = Boolean(descriptor.check());
-        } catch (error) {
-            console.error(`Dependency check failed for ${descriptor.id}:`, error);
-        }
-
-        return {
-            id: descriptor.id,
-            label: descriptor.label,
-            friendlyName: descriptor.friendlyName,
-            met
-        };
-    });
-
-    const missing = results.filter((entry) => !entry.met);
-
-    return {
-        results,
-        missing,
-        allMet: missing.length === 0
-    };
 }
 
 const currentScript = document.currentScript;
@@ -311,10 +274,16 @@ async function handleTalkToUnityLaunch(detail) {
 }
 
 async function startApplication() {
-    console.log('startApplication: Function called.');
+    await ensureMicPermission();
     logToScreen('startApplication: Beginning execution');
     if (appStarted) {
         logToScreen('startApplication: Already started, exiting');
+        return;
+    }
+
+    hasMicPermission = await requestMicPermission();
+    if (!hasMicPermission) {
+        alert('Microphone permission is required to use the application.');
         return;
     }
 
@@ -393,7 +362,9 @@ async function setMutedState(muted, { announce = false } = {}) {
             });
             updateMuteIndicator();
             try {
-                recognition.stop();
+                if (recognition) {
+                    recognition.stop();
+                }
             } catch (error) {
                 console.error('Failed to stop recognition:', error);
             }
@@ -440,7 +411,9 @@ async function setMutedState(muted, { announce = false } = {}) {
     updateMuteIndicator();
 
     try {
-        recognition.start();
+        if (recognition) {
+            recognition.start();
+        }
     } catch (error) {
         console.error('Failed to start recognition:', error);
         setCircleState(userCircle, {
@@ -568,7 +541,14 @@ async function setupSpeechRecognition() {
             return;
         }
     } else if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
+        try {
+            recognition = new SpeechRecognition();
+        } catch (error) {
+            console.error('Failed to create SpeechRecognition instance:', error);
+            alert('Failed to initialize speech recognition. Please check your browser settings and permissions.');
+            setCircleState(userCircle, { label: 'Speech recognition failed to initialize', error: true });
+            return;
+        }
         recognition.continuous = true;
         recognition.lang = 'en-US';
         recognition.interimResults = false;
@@ -705,7 +685,7 @@ function updateMuteIndicator() {
     if (isMuted) {
         const message = hasMicPermission
             ? 'Tap or click anywhere to unmute'
-            : 'Allow microphone access to start';
+            : 'Tap or click anywhere to start';
         indicatorText && (indicatorText.textContent = message);
         muteIndicator.dataset.state = 'muted';
         muteIndicator.setAttribute('aria-label', 'Microphone muted. Tap to enable listening.');
@@ -717,7 +697,10 @@ function updateMuteIndicator() {
 }
 
 async function attemptUnmute() {
-    await setMutedState(false);
+    const permission = await ensureMicPermission();
+    if (permission) {
+        await setMutedState(false);
+    }
 }
 
 function handleMuteToggle(event) {
@@ -781,18 +764,14 @@ function isLikelyUrlSegment(segment) {
 }
 
 function removeMarkdownLinkTargets(value) {
-    if (typeof value !== 'string') {
-        return '';
-    }
-
     return value
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, altText, url) =>
-            isLikelyUrlSegment(url) ? altText : _match
-        )
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, linkText, url) =>
-            isLikelyUrlSegment(url) ? linkText : _match
-        )
-        .replace(/\[\[(?:command|action)[^\]]*\]\([^)]*\)\]/gi, ' ');
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, altText, url) => {
+            return isLikelyUrlSegment(url) ? altText : _match;
+        })
+        .replace(/\ \[\[^\]]*\]\(([^)]+)\)/g, (_match, linkText, url) => {
+            return isLikelyUrlSegment(url) ? linkText : _match;
+        })
+        .replace(/\ \[\[ (?:command|action)[^\\]*\]\([^)]*\)\]/gi, ' ');
 }
 
 function removeCommandArtifacts(value) {
@@ -800,15 +779,18 @@ function removeCommandArtifacts(value) {
         return '';
     }
 
-    return value
-        .replace(/\[\[[^\]]*\bcommand\b[^\]]*\]\]/gi, ' ')
-        .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
-        .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
-        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_\s-]+/gi, ' ')
-        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_\s-]+/gi, ' ')
-        .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
-        .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ')
-        .replace(/^\s*[-*]?\s*(?:command|action)[^\n]*$/gim, ' ');
+    let result = value
+        .replace(/\ \[\[ [^\\]*\\bcommand\\b[^\\]*\]/gi, ' ')
+        .replace(/\([^)]*\\bcommand\\b[^)]*\)/gi, ' ')
+        .replace(/<[^>]*\\bcommand\\b[^>]*>/gi, ' ')
+        .replace(/\\bcommands?\s*[:=-]\s*[a-z0-9_\\s-]+/gi, ' ')
+        .replace(/\\bactions?\s*[:=-]\s*[a-z0-9_\\s-]+/gi, ' ')
+        .replace(/\\b(?:execute|run)\\s+command\\s*(?:[:=-]\\s*)?[a-z0-9_-]*/gi, ' ')
+        .replace(/\\bcommand\\s*(?:[:=-]\\s*|\\s+)(?:[a-z0-9_-]+(?:\\s+[a-z0-9_-]+)*)?/gi, ' ');
+
+    result = result.replace(/^\\s*[-*]?\\s*(?:command|action)[^\\n]*$/gim, ' ');
+
+    return result;
 }
 
 function sanitizeForSpeech(text) {
@@ -817,35 +799,35 @@ function sanitizeForSpeech(text) {
     }
 
     const withoutDirectives = text
-        .replace(/\[\[command:[^\]]*\]\]/gi, ' ')
+        .replace(/\ \[\[command:[^\\]*\]/gi, ' ')
         .replace(/\{command:[^}]*\}/gi, ' ')
         .replace(/<command[^>]*>[^<]*<\/command>/gi, ' ')
-        .replace(/\b(?:command|action)\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
-        .replace(/\bcommands?\s*[:=]\s*([a-z0-9_\-]+)/gi, ' ')
-        .replace(/\b(?:command|action)\s*(?:->|=>|::)\s*([a-z0-9_\-]+)/gi, ' ')
-        .replace(/\bcommand\s*\([^)]*\)/gi, ' ');
+        .replace(/\\b(?:command|action)\\s*[:=]\\s*([a-z0-9_\\-]+)/gi, ' ')
+        .replace(/\\bcommands?\s*[:=]\\s*([a-z0-9_\\-]+)/gi, ' ')
+        .replace(/\\b(?:command|action)\\s*(?:->|=>|::)\\s*([a-z0-9_\\-]+)/gi, ' ')
+        .replace(/\\bcommand\\s*\([^)]*\)/gi, ' ');
 
     const withoutPollinations = withoutDirectives
-        .replace(/https?:\/\/\S*(?:images\.)?pollinations\.ai\S*/gi, ' ')
-        .replace(/\b\S*(?:images\.)?pollinations\.ai\S*\b/gi, ' ');
+        .replace(/https?:\\/\\/\\S*images?.pollinations.ai\\S*/gi, '')
+        .replace(/\\b\\S*images?.pollinations.ai\\S*\\b/gi, '');
 
     const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
     const withoutCommands = removeCommandArtifacts(withoutMarkdownTargets);
 
     const withoutGenericUrls = withoutCommands
-        .replace(/https?:\/\/\S+/gi, ' ')
-        .replace(/\bwww\.[^\s)]+/gi, ' ');
+        .replace(/https?:\\/\\/\\S+/gi, ' ')
+        .replace(/\\bwww\\.[^\\s)]+/gi, ' ');
 
     const withoutSpacedUrls = withoutGenericUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*[\w\-./?%#&=]+/gi, ' ')
-        .replace(/\bhttps?\b/gi, ' ')
-        .replace(/\bwww\b/gi, ' ');
+        .replace(/h\\s*t\\s*t\\s*p\\s*s?\\s*:\\s*\\/\\/\\s*[\\w\\-./?%#&=]+/gi, ' ')
+        .replace(/\\bhttps?\\b/gi, ' ')
+        .replace(/\\bwww\\b/gi, ' ');
 
     const withoutSpelledUrls = withoutSpacedUrls
-        .replace(/h\s*t\s*t\s*p\s*s?\s*(?:[:=]|colon)\s*\/\s*\/\s*[\w\-./?%#&=]+/gi, ' ')
-        .replace(/\b(?:h\s*t\s*t\s*p\s*s?|h\s*t\s*t\s*p)\b/gi, ' ')
-        .replace(/\bcolon\b/gi, ' ')
-        .replace(/\bslash\b/gi, ' ');
+        .replace(/h\\s*t\\s*t\\s*p\\s*s?\\s*(?:[:=]|colon)\\s*\\/\\/\\s*[\\w\\-./?%#&=]+/gi, ' ')
+        .replace(/\\b(?:h\\s*t\\s*t\\s*p\\s*s?|h\\s*t\\s*t\\s*p)\\b/gi, ' ')
+        .replace(/\\bcolon\\b/gi, ' ')
+        .replace(/\\bslash\\b/gi, ' ');
 
     const parts = withoutSpelledUrls.split(/(\s+)/);
     const sanitizedParts = parts.map((part) => {
@@ -853,7 +835,7 @@ function sanitizeForSpeech(text) {
             return '';
         }
 
-        if (/(?:https?|www|:\/\/|\.com|\.net|\.org|\.io|\.ai|\.co|\.gov|\.edu)/i.test(part)) {
+        if (/(?:https?|www|:\/\\/|\\.com|\\.net|\\.org|\\.io|\\.ai|\\.co|\\.gov|\\.edu)/i.test(part)) {
             return '';
         }
 
@@ -901,6 +883,14 @@ function sanitizeForSpeech(text) {
         .trim();
 
     return sanitized;
+}
+
+function cutImageUrl(url) {
+    if (!url) {
+        return '';
+    }
+    const parts = url.split('?');
+    return parts[0];
 }
 
 function sanitizeImageUrl(rawUrl) {
@@ -1093,61 +1083,62 @@ function parseAiDirectives(responseText) {
         return { cleanedText: '', commands: [] };
     }
 
-    const commands = new Set();
+    const commands = [];
     let workingText = responseText;
 
-    const capture = (pattern) => {
-        workingText = workingText.replace(pattern, (_match, rawValue = '') => {
-            const normalized = normalizeCommandValue(String(rawValue));
-            if (normalized) {
-                commands.add(normalized);
-            }
+    const patterns = [
+        /\ \[\[command:\s*([^\\]+)\]/gi,
+        /\{command:\s*([^}]*)\}/gi,
+        /<command[^>]*>\s*([^<]*)<\/command>/gi,
+        /\\bcommand\\s*[:=]\s*([a-z0-9_\\-]+)/gi,
+        /\\bcommands?\s*[:=]\s*([a-z0-9_\\-]+)/gi,
+        /\\baction\s*[:=]\s*([a-z0-9_\\-]+)/gi,
+        /\\b(?:command|action)\\s*(?:->|=>|::)\\s*([a-z0-9_\\-]+)/gi,
+        /\\bcommand\\s*\(\s*([^)]+?)\s*\)/gi
+    ];
 
+    for (const pattern of patterns) {
+        workingText = workingText.replace(pattern, (_match, commandValue) => {
+            if (commandValue) {
+                const normalized = normalizeCommandValue(commandValue);
+                if (normalized) {
+                    commands.push(normalized);
+                }
+            }
             return ' ';
         });
-    };
+    }
 
-    capture(/\[\[\s*command\s*:\s*([^\]]+)\]\]/gi);
-    capture(/\[\s*command\s*:\s*([^\]]+)\]/gi);
-    capture(/\{\s*command\s*:\s*([^}]+)\}/gi);
-    capture(/<command[^>]*>\s*([^<]*)<\/command>/gi);
-    capture(/\bcommand\s*[:=]\s*([a-z0-9_\-]+)/gi);
-    capture(/\bcommands?\s*[:=]\s*([a-z0-9_\-]+)/gi);
-    capture(/\bactions?\s*[:=]\s*([a-z0-9_\-]+)/gi);
-    capture(/\b(?:command|action)\s*(?:->|=>|::)\s*([a-z0-9_\-]+)/gi);
-    capture(/\bcommand\s*\(\s*([^)]+?)\s*\)/gi);
-
-    const slashCommandRegex =
-        /(?:^|\s)\/(open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\b/gi;
+    const slashCommandRegex = /(?:^|\s)\/ (open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\\b/gi;
     workingText = workingText.replace(slashCommandRegex, (_match, commandValue) => {
         const normalized = normalizeCommandValue(commandValue);
         if (normalized) {
-            commands.add(normalized);
+            commands.push(normalized);
         }
         return ' ';
     });
 
-    const directiveBlockRegex =
-        /(?:^|\n)\s*(?:commands?|actions?)\s*:?\s*(?:\n|$)((?:\s*[-*•]?\s*[a-z0-9_\-]+\s*(?:\(\))?\s*(?:\n|$))+)/gi;
+    const directiveBlockRegex = /(?:^|\\n)\\s*(?:commands?|actions?)\\s*:?\\s*(?:\\n|$ )((?:\\s*[-*•]?\\s*[a-z0-9_\\-]+\\s*(?:\\(\\))?\\s*(?:\\n|$))+)/gi;
     workingText = workingText.replace(directiveBlockRegex, (_match, blockContent) => {
         const lines = blockContent
-            .split(/\n+/)
+            .split(/\\n+/) // Split by one or more newlines
             .map((line) => line.replace(/^[^a-z0-9]+/i, '').trim())
             .filter(Boolean);
 
         for (const line of lines) {
             const normalized = normalizeCommandValue(line.replace(/\(\)/g, ''));
             if (normalized) {
-                commands.add(normalized);
+                commands.push(normalized);
             }
         }
 
-        return '\n';
+        return '\\n';
     });
 
-    const cleanedText = workingText.replace(/\n{3,}/g, '\n\n').trim();
+    const cleanedText = workingText.replace(/\\n{3,}/g, '\\n\\n').trim();
+    const uniqueCommands = [...new Set(commands)];
 
-    return { cleanedText, commands: [...commands] };
+    return { cleanedText, commands: uniqueCommands };
 }
 
 async function executeAiCommand(command, options = {}) {
@@ -1425,7 +1416,7 @@ async function getAIResponse(userInput) {
 
         const { cleanedText, commands } = parseAiDirectives(aiText);
         const assistantMessage = cleanedText || aiText;
-        const imageUrlFromResponse = extractImageUrl(aiText) || extractImageUrl(assistantMessage);
+        const imageUrlFromResponse = cutImageUrl(extractImageUrl(aiText) || extractImageUrl(assistantMessage));
 
         const imageCommandQueue = [];
         for (const command of commands) {
@@ -1675,3 +1666,17 @@ window.addEventListener('talk-to-unity:launch', () => {
 });
 
 // NOTE: removed the duplicate 'talk-to-unity:launch' listener that was previously included.
+
+async function ensureMicPermission() {
+    if (hasMicPermission) {
+        return true;
+    }
+
+    const permission = await requestMicPermission();
+    if (permission) {
+        hasMicPermission = true;
+        updateMuteIndicator();
+    }
+
+    return permission;
+}
