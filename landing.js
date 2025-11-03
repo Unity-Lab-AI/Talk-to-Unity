@@ -68,13 +68,20 @@
 
     function updateLaunchButtonState({ allMet, missing }) {
         if (!launchButton) return;
-        launchButton.disabled = false;
-        launchButton.setAttribute('aria-disabled', 'false');
+
+        const shouldDisable = !allMet;
+        launchButton.disabled = shouldDisable;
+        launchButton.setAttribute('aria-disabled', String(shouldDisable));
         launchButton.dataset.state = allMet ? 'ready' : 'warn';
-        if (missing.length > 0) {
+
+        if (shouldDisable) {
             const summary = formatDependencyList(missing);
-            launchButton.title = `Talk to Unity with limited support: ${summary}`;
-        } else launchButton.removeAttribute('title');
+            launchButton.title = summary
+                ? `Finish the checks: resolve ${summary} to unlock Talk to Unity.`
+                : 'Finish the checks to unlock Talk to Unity.';
+        } else {
+            launchButton.removeAttribute('title');
+        }
     }
 
     function showRecheckInProgress() {
@@ -220,8 +227,8 @@
                 const summary = formatDependencyList(missing);
                 setStatusMessage(
                     summary
-                        ? `Some browser features are unavailable: ${summary}. You can continue, but certain Unity abilities may be limited.`
-                        : 'Some browser features are unavailable. You can continue, but certain Unity abilities may be limited.',
+                        ? `Some browser features are unavailable: ${summary}. Fix these to unlock Talk to Unity.`
+                        : 'Some browser features are unavailable. Fix the highlighted alerts to unlock Talk to Unity.',
                     'warning'
                 );
             }
@@ -259,8 +266,8 @@
             else {
                 const summary = formatDependencyList(missing);
                 dependencySummary.textContent = summary
-                    ? `Alerts: ${summary}. You can still launch, but features may be limited until these are resolved.`
-                    : 'Alerts detected. You can still launch, but features may be limited.';
+                    ? `Alerts: ${summary}. Fix these to unlock Talk to Unity.`
+                    : 'Alerts detected. Fix the highlighted items to unlock Talk to Unity.';
             }
         }
 
