@@ -23,6 +23,7 @@ function logToScreen(message) {
    - Hidden by default
    - Toggle with ` or ~
    - Word wrap + scroll + capped lines
+========================= */
 const heroStage = document.getElementById('hero-stage');
 const heroImage = document.getElementById('hero-image');
 const muteIndicator = document.getElementById('mute-indicator');
@@ -30,6 +31,10 @@ const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
 const loadingIndicator = document.getElementById('loading-indicator');
+const landingSection = document.getElementById('landing');
+const appRoot = document.getElementById('app-root');
+const launchButton = document.getElementById('launch-app');
+const recheckButton = document.getElementById('recheck-dependencies');
 
 if (heroImage) {
     heroImage.setAttribute('crossorigin', 'anonymous');
@@ -52,6 +57,7 @@ let currentHeroUrl = '';
 let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
+let appStarted = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
@@ -116,6 +122,44 @@ function resolveAssetPath(relativePath) {
         console.error('Failed to resolve asset path:', error);
         return relativePath;
     }
+}
+
+function updateDependencyUI(results, allMet, { announce = false, missing = [] } = {}) {
+    const summary = missing
+        .map((item) => item.label || item.friendlyName || item.id)
+        .filter(Boolean)
+        .join(', ');
+
+    if (announce) {
+        if (allMet) {
+            logToScreen('All browser requirements satisfied.');
+        } else if (summary) {
+            logToScreen(`Missing capabilities detected: ${summary}`);
+        } else {
+            logToScreen('Some browser requirements are unavailable.');
+        }
+    }
+
+    return { results, allMet, missing };
+}
+
+function evaluateDependencies({ announce = false } = {}) {
+    const results = dependencyChecks.map((descriptor) => {
+        let met = false;
+        try {
+            met = Boolean(descriptor.check());
+        } catch (error) {
+            console.error(`Dependency check failed for ${descriptor.id}:`, error);
+        }
+        return { ...descriptor, met };
+    });
+
+    const missing = results.filter((result) => !result.met);
+    const allMet = missing.length === 0;
+
+    updateDependencyUI(results, allMet, { announce, missing });
+
+    return { results, missing, allMet };
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -675,14 +719,18 @@ function isLikelyUrlSegment(segment) {
 }
 
 function removeMarkdownLinkTargets(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
     return value
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, altText, url) => {
-            return isLikelyUrlSegment(url) ? altText : _match;
-        })
-        .replace(/\ \[\[^\]]*\]\(([^)]+)\)/g, (_match, linkText, url) => {
-            return isLikelyUrlSegment(url) ? linkText : _match;
-        })
-        .replace(/\ \[\[ (?:command|action)[^\\]*\]\([^)]*\)\]/gi, ' ');
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, altText, url) =>
+            isLikelyUrlSegment(url) ? altText : match
+        )
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) =>
+            isLikelyUrlSegment(url) ? linkText : match
+        )
+        .replace(/\[\[(?:command|action)[^\]]*\]\([^)]*\)\]/gi, ' ');
 }
 
 function removeCommandArtifacts(value) {
@@ -691,15 +739,15 @@ function removeCommandArtifacts(value) {
     }
 
     let result = value
-        .replace(/\ \[\[ [^\\]*\\bcommand\\b[^\\]*\]/gi, ' ')
-        .replace(/\([^)]*\\bcommand\\b[^)]*\)/gi, ' ')
-        .replace(/<[^>]*\\bcommand\\b[^>]*>/gi, ' ')
-        .replace(/\\bcommands?\s*[:=-]\s*[a-z0-9_\\s-]+/gi, ' ')
-        .replace(/\\bactions?\s*[:=-]\s*[a-z0-9_\\s-]+/gi, ' ')
-        .replace(/\\b(?:execute|run)\\s+command\\s*(?:[:=-]\\s*)?[a-z0-9_-]*/gi, ' ')
-        .replace(/\\bcommand\\s*(?:[:=-]\\s*|\\s+)(?:[a-z0-9_-]+(?:\\s+[a-z0-9_-]+)*)?/gi, ' ');
+        .replace(/\[\[[^\]]*\bcommand\b[^\]]*\]\s*/gi, ' ')
+        .replace(/\([^)]*\bcommand\b[^)]*\)/gi, ' ')
+        .replace(/<[^>]*\bcommand\b[^>]*>/gi, ' ')
+        .replace(/\bcommands?\s*[:=-]\s*[a-z0-9_\s-]+/gi, ' ')
+        .replace(/\bactions?\s*[:=-]\s*[a-z0-9_\s-]+/gi, ' ')
+        .replace(/\b(?:execute|run)\s+command\s*(?:[:=-]\s*)?[a-z0-9_-]*/gi, ' ')
+        .replace(/\bcommand\s*(?:[:=-]\s*|\s+)(?:[a-z0-9_-]+(?:\s+[a-z0-9_-]+)*)?/gi, ' ');
 
-    result = result.replace(/^\\s*[-*]?\\s*(?:command|action)[^\\n]*$/gim, ' ');
+    result = result.replace(/^\s*[-*]?\s*(?:command|action)[^\n]*$/gim, ' ');
 
     return result;
 }
@@ -710,35 +758,35 @@ function sanitizeForSpeech(text) {
     }
 
     const withoutDirectives = text
-        .replace(/\ \[\[command:[^\\]*\]/gi, ' ')
+        .replace(/\[\[command:[^\]]*\]\]/gi, ' ')
         .replace(/\{command:[^}]*\}/gi, ' ')
         .replace(/<command[^>]*>[^<]*<\/command>/gi, ' ')
-        .replace(/\\b(?:command|action)\\s*[:=]\\s*([a-z0-9_\\-]+)/gi, ' ')
-        .replace(/\\bcommands?\s*[:=]\\s*([a-z0-9_\\-]+)/gi, ' ')
-        .replace(/\\b(?:command|action)\\s*(?:->|=>|::)\\s*([a-z0-9_\\-]+)/gi, ' ')
-        .replace(/\\bcommand\\s*\([^)]*\)/gi, ' ');
+        .replace(/\b(?:command|action)\s*[:=]\s*([a-z0-9_-]+)/gi, ' ')
+        .replace(/\bcommands?\s*[:=]\s*([a-z0-9_-]+)/gi, ' ')
+        .replace(/\b(?:command|action)\s*(?:->|=>|::)\s*([a-z0-9_-]+)/gi, ' ')
+        .replace(/\bcommand\s*\([^)]*\)/gi, ' ');
 
     const withoutPollinations = withoutDirectives
-        .replace(/https?:\\/\\/\\S*images?.pollinations.ai\\S*/gi, '')
-        .replace(/\\b\\S*images?.pollinations.ai\\S*\\b/gi, '');
+        .replace(/https?:\/\/\S*images?.pollinations.ai\S*/gi, '')
+        .replace(/\b\S*images?.pollinations.ai\S*\b/gi, '');
 
     const withoutMarkdownTargets = removeMarkdownLinkTargets(withoutPollinations);
     const withoutCommands = removeCommandArtifacts(withoutMarkdownTargets);
 
     const withoutGenericUrls = withoutCommands
-        .replace(/https?:\\/\\/\\S+/gi, ' ')
-        .replace(/\\bwww\\.[^\\s)]+/gi, ' ');
+        .replace(/https?:\/\/\S+/gi, ' ')
+        .replace(/\bwww\.[^\s)]+/gi, ' ');
 
     const withoutSpacedUrls = withoutGenericUrls
-        .replace(/h\\s*t\\s*t\\s*p\\s*s?\\s*:\\s*\\/\\/\\s*[\\w\\-./?%#&=]+/gi, ' ')
-        .replace(/\\bhttps?\\b/gi, ' ')
-        .replace(/\\bwww\\b/gi, ' ');
+        .replace(/h\s*t\s*t\s*p\s*s?\s*:\s*\/\/[\w\-./?%#&=]+/gi, ' ')
+        .replace(/\bhttps?\b/gi, ' ')
+        .replace(/\bwww\b/gi, ' ');
 
     const withoutSpelledUrls = withoutSpacedUrls
-        .replace(/h\\s*t\\s*t\\s*p\\s*s?\\s*(?:[:=]|colon)\\s*\\/\\/\\s*[\\w\\-./?%#&=]+/gi, ' ')
-        .replace(/\\b(?:h\\s*t\\s*t\\s*p\\s*s?|h\\s*t\\s*t\\s*p)\\b/gi, ' ')
-        .replace(/\\bcolon\\b/gi, ' ')
-        .replace(/\\bslash\\b/gi, ' ');
+        .replace(/h\s*t\s*t\s*p\s*s?\s*(?:[:=]|colon)\s*\/\/[\w\-./?%#&=]+/gi, ' ')
+        .replace(/\b(?:h\s*t\s*t\s*p\s*s?|h\s*t\s*t\s*p)\b/gi, ' ')
+        .replace(/\bcolon\b/gi, ' ')
+        .replace(/\bslash\b/gi, ' ');
 
     const parts = withoutSpelledUrls.split(/(\s+)/);
     const sanitizedParts = parts.map((part) => {
@@ -746,15 +794,15 @@ function sanitizeForSpeech(text) {
             return '';
         }
 
-        if (/(?:https?|www|:\/\\/|\\.com|\\.net|\\.org|\\.io|\\.ai|\\.co|\\.gov|\\.edu)/i.test(part)) {
+        if (/(?:https?|www|:\/\/|\.com|\.net|\.org|\.io|\.ai|\.co|\.gov|\.edu)/i.test(part)) {
             return '';
         }
 
-        if (/\\bcommand\\b/i.test(part)) {
+        if (/\bcommand\b/i.test(part)) {
             return '';
         }
 
-        if (/(?:image|artwork|photo)\\s+(?:url|link)/i.test(part)) {
+        if (/(?:image|artwork|photo)\s+(?:url|link)/i.test(part)) {
             return '';
         }
 
@@ -779,23 +827,21 @@ function sanitizeForSpeech(text) {
 
     let sanitized = sanitizedParts
         .join('')
-        .replace(/\\s{2,}/g, ' ')
-        .replace(/\\s+([.,!?;:])/g, '$1')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\s+([.,!?;:])/g, '$1')
         .replace(/\(\s*\)/g, '')
-        .replace(/\\\[\\s*\]/g, '')
+        .replace(/\[\s*\]/g, '')
         .replace(/\{\s*\}/g, '')
-        .replace(/\\b(?:https?|www)\\b/gi, '')
-        .replace(/\\b[a-z0-9]+\\s+dot\\s+[a-z0-9]+\\b/gi, '')
-        .replace(/\\b(?:dot\\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\\b/gi, '')
-
+        .replace(/\b(?:https?|www)\b/gi, '')
+        .replace(/\b[a-z0-9]+\s+dot\s+[a-z0-9]+\b/gi, '')
+        .replace(/\b(?:dot\s+)(?:com|net|org|io|ai|co|gov|edu|xyz)\b/gi, '')
         .replace(/<\s*>/g, '')
-        .replace(/\\bcommand\\b/gi, '')
-        .replace(/\\b(?:image|artwork|photo)\\s+(?:url|link)\\b.*$/gim, '')
+        .replace(/\bcommand\b/gi, '')
+        .replace(/\b(?:image|artwork|photo)\s+(?:url|link)\b.*$/gim, '')
         .trim();
 
     return sanitized;
 }
-
 function sanitizeImageUrl(rawUrl) {
     if (typeof rawUrl !== 'string') {
         return '';
@@ -989,30 +1035,28 @@ function parseAiDirectives(responseText) {
     const commands = [];
     let workingText = responseText;
 
-    const patterns = [
-        /\ \[\[command:\s*([^\\]+)\]/gi,
-        /\{command:\s*([^}]*)\}/gi,
+    const directivePatterns = [
+        /\[\[\s*(?:command|action)\s*:\s*([^\]]+)\]\]/gi,
+        /\[\s*(?:command|action)\s*:\s*([^\]]+)\]/gi,
+        /\{(?:command|action)\s*:\s*([^}]+)\}/gi,
         /<command[^>]*>\s*([^<]*)<\/command>/gi,
-        /\\bcommand\\s*[:=]\s*([a-z0-9_\\-]+)/gi,
-        /\\bcommands?\s*[:=]\s*([a-z0-9_\\-]+)/gi,
-        /\\baction\s*[:=]\s*([a-z0-9_\\-]+)/gi,
-        /\\b(?:command|action)\\s*(?:->|=>|::)\\s*([a-z0-9_\\-]+)/gi,
-        /\\bcommand\\s*\(\s*([^)]+?)\s*\)/gi
+        /\b(?:command|action)\s*[:=]\s*([a-z0-9_\-]+)/gi,
+        /\bcommands?\s*[:=]\s*([a-z0-9_\-]+)/gi,
+        /\b(?:command|action)\s*(?:->|=>|::)\s*([a-z0-9_\-]+)/gi,
+        /\bcommand\s*\(\s*([^)]+?)\s*\)/gi
     ];
 
-    for (const pattern of patterns) {
-        workingText = workingText.replace(pattern, (_match, commandValue) => {
-            if (commandValue) {
-                const normalized = normalizeCommandValue(commandValue);
-                if (normalized) {
-                    commands.push(normalized);
-                }
+    for (const pattern of directivePatterns) {
+        workingText = workingText.replace(pattern, (_match, commandValue = '') => {
+            const normalized = normalizeCommandValue(commandValue);
+            if (normalized) {
+                commands.push(normalized);
             }
             return ' ';
         });
     }
 
-    const slashCommandRegex = /(?:^|\s)\/ (open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\\b/gi;
+    const slashCommandRegex = /(?:^|\s)\/\s*(open_image|save_image|copy_image|mute_microphone|unmute_microphone|stop_speaking|shutup|set_model_flux|set_model_turbo|set_model_kontext|clear_chat_history|theme_light|theme_dark)\b/gi;
     workingText = workingText.replace(slashCommandRegex, (_match, commandValue) => {
         const normalized = normalizeCommandValue(commandValue);
         if (normalized) {
@@ -1021,10 +1065,11 @@ function parseAiDirectives(responseText) {
         return ' ';
     });
 
-    const directiveBlockRegex = /(?:^|\\n)\\s*(?:commands?|actions?)\\s*:?\\s*(?:\\n|$ )((?:\\s*[-*•]?\\s*[a-z0-9_\\-]+\\s*(?:\\(\\))?\\s*(?:\\n|$))+)/gi;
-    workingText = workingText.replace(directiveBlockRegex, (_match, blockContent) => {
+    const directiveBlockRegex = /(?:^|\n)\s*(?:commands?|actions?)\s*:?\s*(?:\n|$)((?:\s*[-*•]?\s*[a-z0-9_\-]+(?:\s*\(\s*[a-z0-9_\-]*\s*\))?\s*(?:\n|$))+)/gi;
+
+    workingText = workingText.replace(directiveBlockRegex, (_match, blockContent = '') => {
         const lines = blockContent
-            .split(/\\n+/) // Split by one or more newlines
+            .split(/\n+/)
             .map((line) => line.replace(/^[^a-z0-9]+/i, '').trim())
             .filter(Boolean);
 
@@ -1035,15 +1080,14 @@ function parseAiDirectives(responseText) {
             }
         }
 
-        return '\\n';
+        return '\n';
     });
 
-    const cleanedText = workingText.replace(/\\n{3,}/g, '\\n\\n').trim();
+    const cleanedText = workingText.replace(/\n{3,}/g, '\n\n').trim();
     const uniqueCommands = [...new Set(commands)];
 
     return { cleanedText, commands: uniqueCommands };
 }
-
 async function executeAiCommand(command, options = {}) {
     if (!command) {
         return false;
@@ -1379,6 +1423,18 @@ async function getAIResponse(userInput) {
             }
         }
 
+        const responsePayload = {
+            text: finalAssistantMessage,
+            rawText: aiText,
+            commands,
+            imageUrl: selectedImageUrl || '',
+            fallbackImageUrl,
+            heroState: heroStage?.dataset.state || '',
+            heroUrl: getImageUrl() || pendingHeroUrl || '',
+            theme: document.body?.dataset.theme || currentTheme
+        };
+
+        return responsePayload;
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
         setCircleState(aiCircle, {
@@ -1392,6 +1448,8 @@ async function getAIResponse(userInput) {
                 label: 'Unity is idle'
             });
         }, 2400);
+
+        return { error: error instanceof Error ? error : new Error('AI response failed') };
     }
 }
 
