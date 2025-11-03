@@ -8,7 +8,13 @@
     <link rel="stylesheet" href="./style.css">
     <!-- endbuild css -->
     <!-- build:js -->
+    <script defer src="../scripts/shared.js"></script>
     <script defer src="./app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.initializeSharedDependencies?.();
+        });
+    </script>
     <!-- endbuild js -->
 </head>
 

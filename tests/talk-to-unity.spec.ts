@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 declare global {
     interface UnityTestHooks {
         getChatHistory(): Array<{ role: string; content: string }>;
-        sendUserInput(input: string): Promise<{
+        sendUserInput(input: string): Promise<{ 
             text?: string;
             rawText?: string;
             imageUrl?: string;

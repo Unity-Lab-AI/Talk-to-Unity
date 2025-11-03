@@ -37,8 +37,16 @@
             document.body.style.visibility = 'visible';
         });
     </script>
+    <script src="scripts/shared.js" defer></script>
     <script src="landing.js?v=20240606" defer></script>
     <script src="AI/app.js" defer></script>
+    <script defer>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initializeSharedDependencies) {
+                window.initializeSharedDependencies();
+            }
+        });
+    </script>
     <noscript>
         <link rel="stylesheet" href="./style.css?v=20240606" />
         <link rel="stylesheet" href="./AI/style.css" />
