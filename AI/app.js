@@ -23,81 +23,13 @@ function logToScreen(message) {
    - Hidden by default
    - Toggle with ` or ~
    - Word wrap + scroll + capped lines
-========================= */
-(function ensureDebugOverlay() {
-    try {
-        if (document.getElementById('debug-overlay')) return;
-
-        const box = document.createElement('div');
-        box.id = 'debug-overlay';
-        Object.assign(box.style, {
-            position: 'fixed',
-            bottom: '10px',
-            left: '10px',
-            width: '460px',
-            maxHeight: '260px',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            backgroundColor: 'rgba(0,0,0,0.85)',
-            color: '#9fffb2',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            fontSize: '12px',
-            lineHeight: '1.4',
-            padding: '8px',
-            borderRadius: '8px',
-            border: '1px solid #333',
-            zIndex: '2147483647',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            display: 'none' // start hidden
-        });
-        document.addEventListener('DOMContentLoaded', () => {
-            // ensure it mounts after body exists
-            if (!document.getElementById('debug-overlay')) {
-                document.body.appendChild(box);
-            }
-        });
-
-        // Toggle on backtick or tilde
-        window.addEventListener('keydown', (e) => {
-            if (e.key === '`' || e.key === '~') {
-                e.preventDefault();
-                const el = document.getElementById('debug-overlay');
-                if (!el) return;
-                el.style.display = el.style.display === 'none' ? 'block' : 'none';
-            }
-        });
-
-        // Soft-hook console.log so overlay mirrors logs (still prints to real console)
-        const originalLog = console.log;
-        console.log = (...args) => {
-            try {
-                const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ');
-                logToScreen(msg);
-            } catch (_) {
-                // ignore overlay errors
-            }
-            originalLog.apply(console, args);
-        };
-    } catch (_) {
-        // Overlay setup should never block the app
-    }
-})();
-
-logToScreen('AI/app.js loaded');
-const landingSection = document.getElementById('landing');
-const appRoot = document.getElementById('app-root');
 const heroStage = document.getElementById('hero-stage');
 const heroImage = document.getElementById('hero-image');
 const muteIndicator = document.getElementById('mute-indicator');
 const indicatorText = muteIndicator?.querySelector('.indicator-text') ?? null;
 const aiCircle = document.querySelector('[data-role="ai"]');
 const userCircle = document.querySelector('[data-role="user"]');
-const dependencyLight = document.querySelector('[data-role="dependency-light"]');
-const dependencySummary = document.getElementById('dependency-summary');
-const dependencyList = document.getElementById('dependency-list');
-const launchButton = document.getElementById('launch-app');
-const recheckButton = document.getElementById('recheck-dependencies');
+const loadingIndicator = document.getElementById('loading-indicator');
 
 if (heroImage) {
     heroImage.setAttribute('crossorigin', 'anonymous');
@@ -120,7 +52,6 @@ let currentHeroUrl = '';
 let pendingHeroUrl = '';
 let currentTheme = 'dark';
 let recognitionRestartTimeout = null;
-let appStarted = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const synth = window.speechSynthesis;
 
@@ -1448,12 +1379,6 @@ async function getAIResponse(userInput) {
             }
         }
 
-        return {
-            text: finalAssistantMessage,
-            rawText: aiText,
-            imageUrl: selectedImageUrl,
-            commands
-        };
     } catch (error) {
         console.error('Error getting text from Pollinations AI:', error);
         setCircleState(aiCircle, {
@@ -1467,8 +1392,6 @@ async function getAIResponse(userInput) {
                 label: 'Unity is idle'
             });
         }, 2400);
-
-        return { error };
     }
 }
 

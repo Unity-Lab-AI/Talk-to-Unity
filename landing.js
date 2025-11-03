@@ -1,12 +1,8 @@
 (() => {
     const dependencyLight = document.querySelector('[data-role="dependency-light"]');
     const dependencySummary = document.getElementById('dependency-summary');
-    const dependencyList = document.getElementById('dependency-list');
     const launchButton = document.getElementById('launch-app');
-    const recheckButton = document.getElementById('recheck-dependencies');
     const statusMessage = document.getElementById('status-message');
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
 
     const LOOPBACK_HOST_PATTERN = /^(?:localhost|127(?:\.\d{1,3}){3}|::1|\[::1\])$/;
 
@@ -43,6 +39,19 @@
     ];
 
     let landingInitialized = false;
+
+    function setStatusMessage(message, tone = 'info') {
+        if (!statusMessage) {
+            return;
+        }
+
+        statusMessage.textContent = message;
+        if (message) {
+            statusMessage.dataset.tone = tone;
+        } else {
+            delete statusMessage.dataset.tone;
+        }
+    }
 
     function formatDependencyList(items) {
         const labels = items.map((item) => item.friendlyName ?? item.label ?? item.id).filter(Boolean);
@@ -246,7 +255,6 @@
 
         if (dependencyLight) {
             dependencyLight.dataset.state = allMet ? 'pass' : 'fail';
-            const summary = formatDependencyList(missing);
             dependencyLight.setAttribute(
                 'aria-label',
                 allMet ? 'All dependencies satisfied' : `Missing requirements: ${summary}`
@@ -263,6 +271,7 @@
                     : 'Alerts detected. You can still launch, but features may be limited.';
             }
         }
+    }
 
         if (!announce && !allMet) setStatusMessage('');
     }

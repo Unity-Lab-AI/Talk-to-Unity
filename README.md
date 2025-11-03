@@ -7,7 +7,10 @@ Talk to Unity is a single web page that acts like a friendly concierge. The land
 
 ## What you need
 
-- A recent version of Chrome, Edge, or Safari. (Firefox still lacks the speech tools we use.)
+- A recent version of Chrome, Edge, Safari, or Firefox.
+  - Chrome, Edge, and Safari use native Web Speech Recognition
+  - Firefox uses Vosklet (WebAssembly-based speech recognition) as a fallback
+    - First-time Firefox users will download a ~50MB speech model (cached for future use)
 - A secure address — either `https://` on the web or `http://localhost` while testing.
 - Speakers or headphones so you can hear Unity talk.
 - A microphone and permission to use it.
