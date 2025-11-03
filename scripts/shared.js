@@ -158,7 +158,61 @@ window.handleLaunchButtonClick = function handleLaunchButtonClick(event) {
     const result = window.evaluateDependencies({ announce: true });
     if (!result) return;
     const { allMet, missing, results } = result;
-    window.dispatchEvent(new CustomEvent('talk-to-unity:launch', { detail: { allMet, missing, results } }));
+
+    // Update UI based on dependency check results
+    window.setStatusMessage(allMet
+        ? 'All systems look good. Launching Talk to Unity…'
+        : `Launching Talk to Unity. Some features may be limited until we resolve: ${window.formatDependencyList(missing)}.`, allMet ? 'success' : 'warning');
+    document.cookie = 'checks-passed=true;path=/';
+    window.dependencyLight?.setAttribute('aria-label', allMet
+        ? 'All dependencies satisfied. Launching Talk to Unity'
+        : `Launching with limited functionality: ${window.formatDependencyList(missing)}`);
+
+    if (window.launchButton) {
+        window.launchButton.disabled = true;
+        window.launchButton.setAttribute('aria-disabled', 'true');
+        window.launchButton.dataset.state = 'pending';
+    }
+
+    if (window.startApplication) {
+        window.startApplication();
+    } else {
+        const launchUrl = resolveAppLaunchUrl();
+        if (launchUrl) {
+            window.location.href = launchUrl;
+        }
+    }
+}
+
+function resolveAppLaunchUrl() {
+    // Fixed version — ensures the correct relative path works on all browsers
+    const configuredBase =
+        typeof window.__talkToUnityAssetBase === 'string' && window.__talkToUnityAssetBase
+            ? window.__talkToUnityAssetBase
+            : '';
+    let base = ensureTrailingSlash(configuredBase);
+
+    if (!base) {
+        try {
+            base = ensureTrailingSlash(new URL('.', window.location.href).toString());
+        } catch {
+            console.warn('Unable to determine Talk to Unity base path. Falling back to relative navigation.');
+            base = '';
+        }
+    }
+
+    try {
+        // ✅ Fixed: Always points to ./AI/index.html with proper slash
+        return new URL('./AI/index.html', base || window.location.href).toString();
+    } catch (error) {
+        console.warn('Failed to resolve Talk to Unity application URL. Using a relative fallback.', error);
+        return './AI/index.html';
+    }
+}
+
+function ensureTrailingSlash(value) {
+    if (typeof value !== 'string' || !value) return '';
+    return value.endsWith('/') ? value : `${value}/`;
 }
 
 window.initializeSharedDependencies = function() {
