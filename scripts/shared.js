@@ -152,12 +152,24 @@ window.updateLaunchButtonState = function updateLaunchButtonState({ allMet, miss
     }
 };
 
+window.handleLaunchButtonClick = function handleLaunchButtonClick(event) {
+    console.log('handleLaunchButtonClick event:', event);
+    event.preventDefault(); // Prevent default button behavior (e.g., scrolling)
+    const result = window.evaluateDependencies({ announce: true });
+    if (!result) return;
+    const { allMet, missing, results } = result;
+    window.dispatchEvent(new CustomEvent('talk-to-unity:launch', { detail: { allMet, missing, results } }));
+}
+
 window.initializeSharedDependencies = function() {
     window.synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
     window.evaluateDependencies();
     const recheckButton = document.getElementById('recheck-dependencies');
     recheckButton?.addEventListener('click', () => {
         window.evaluateDependencies({ announce: true });
+    });
+    window.launchButton?.addEventListener('click', (event) => {
+        handleLaunchButtonClick(event);
     });
     window.addEventListener('focus', () => {
         if (!window.appStarted) {
