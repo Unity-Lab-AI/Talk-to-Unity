@@ -1,13 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import DependencyChecker from './lib/components/DependencyChecker.svelte';
+  import VoiceInteraction from './lib/components/VoiceInteraction.svelte';
 
   let appState: 'landing' | 'running' = 'landing';
 
   function handleLaunch() {
     appState = 'running';
-    // TODO: Initialize voice interaction
-    console.log('Launching Unity Voice Lab...');
   }
 
   onMount(() => {
@@ -71,15 +70,6 @@
       </div>
     </section>
   {:else}
-    <div class="app-shell">
-      <header class="status-banner" role="status" aria-live="polite">
-        <button class="mute-indicator" data-state="muted" type="button">
-          <span class="indicator-text">Tap or click anywhere to unmute</span>
-        </button>
-      </header>
-      <main class="layout" aria-live="polite">
-        <p>Voice interaction UI coming soon...</p>
-      </main>
-    </div>
+    <VoiceInteraction />
   {/if}
 </main>
