@@ -43,20 +43,6 @@
     ];
 
     let landingInitialized = false;
-    const dependencyOverrides = new Map();
-
-    function clearDependencyOverrides() {
-        dependencyOverrides.clear();
-    }
-
-    function setDependencyOverride(id, met) {
-        if (!id) return;
-        dependencyOverrides.set(id, Boolean(met));
-    }
-
-    function getDependencyOverride(id) {
-        return dependencyOverrides.has(id) ? dependencyOverrides.get(id) : undefined;
-    }
 
     function formatDependencyList(items) {
         const labels = items.map((item) => item.friendlyName ?? item.label ?? item.id).filter(Boolean);
@@ -82,20 +68,13 @@
 
     function updateLaunchButtonState({ allMet, missing }) {
         if (!launchButton) return;
-
-        const shouldDisable = !allMet;
-        launchButton.disabled = shouldDisable;
-        launchButton.setAttribute('aria-disabled', String(shouldDisable));
+        launchButton.disabled = false;
+        launchButton.setAttribute('aria-disabled', 'false');
         launchButton.dataset.state = allMet ? 'ready' : 'warn';
-
-        if (shouldDisable) {
+        if (missing.length > 0) {
             const summary = formatDependencyList(missing);
-            launchButton.title = summary
-                ? `Finish the checks: resolve ${summary} to unlock Talk to Unity.`
-                : 'Finish the checks to unlock Talk to Unity.';
-        } else {
-            launchButton.removeAttribute('title');
-        }
+            launchButton.title = `Talk to Unity with limited support: ${summary}`;
+        } else launchButton.removeAttribute('title');
     }
 
     function showRecheckInProgress() {
@@ -201,19 +180,7 @@
             launchButton.dataset.state = 'pending';
         }
 
-        const appRoot = document.getElementById('app-root');
-        const landingPage = document.getElementById('landing');
-        if (appRoot && landingPage) {
-            landingPage.setAttribute('hidden', 'true');
-            appRoot.removeAttribute('hidden');
-            console.log('Transitioning to AI app view.');
-        } else {
-            const launchUrl = resolveAppLaunchUrl();
-            if (launchUrl) {
-                console.log('Launching AI app at:', launchUrl);
-                window.location.href = launchUrl;
-            }
-        }
+
     }
 
     window.addEventListener('talk-to-unity:launch', handleLaunchEvent);
@@ -222,14 +189,10 @@
     function evaluateDependencies({ announce = false } = {}) {
         const results = dependencyChecks.map((descriptor) => {
             let met = false;
-            const override = getDependencyOverride(descriptor.id);
-            if (typeof override !== 'undefined') met = Boolean(override);
-            else {
-                try {
-                    met = Boolean(descriptor.check());
-                } catch (error) {
-                    console.error(`Dependency check failed for ${descriptor.id}:`, error);
-                }
+            try {
+                met = Boolean(descriptor.check());
+            } catch (error) {
+                console.error(`Dependency check failed for ${descriptor.id}:`, error);
             }
             return { ...descriptor, met };
         });
@@ -245,8 +208,8 @@
                 const summary = formatDependencyList(missing);
                 setStatusMessage(
                     summary
-                        ? `Some browser features are unavailable: ${summary}. Fix these to unlock Talk to Unity.`
-                        : 'Some browser features are unavailable. Fix the highlighted alerts to unlock Talk to Unity.',
+                        ? `Some browser features are unavailable: ${summary}. You can continue, but certain Unity abilities may be limited.`
+                        : 'Some browser features are unavailable. You can continue, but certain Unity abilities may be limited.',
                     'warning'
                 );
             }
@@ -284,46 +247,11 @@
             else {
                 const summary = formatDependencyList(missing);
                 dependencySummary.textContent = summary
-                    ? `Alerts: ${summary}. Fix these to unlock Talk to Unity.`
-                    : 'Alerts detected. Fix the highlighted items to unlock Talk to Unity.';
+                    ? `Alerts: ${summary}. You can still launch, but features may be limited until these are resolved.`
+                    : 'Alerts detected. You can still launch, but features may be limited.';
             }
         }
 
         if (!announce && !allMet) setStatusMessage('');
     }
-
-    function createLandingTestHooks() {
-        if (typeof window === 'undefined') return;
-        const hooks = {
-            initialize() {
-                clearDependencyOverrides();
-                bootstrapLandingExperience();
-                return evaluateDependencies();
-            },
-            evaluateDependencies(options) {
-                return evaluateDependencies(options);
-            },
-            markAllDependenciesReady() {
-                dependencyChecks.forEach((descriptor) => setDependencyOverride(descriptor.id, true));
-                return evaluateDependencies({ announce: true });
-            },
-            setDependencyState(id, met) {
-                if (!id) return null;
-                setDependencyOverride(id, met);
-                return evaluateDependencies({ announce: true });
-            },
-            resetOverrides() {
-                clearDependencyOverrides();
-                return evaluateDependencies();
-            }
-        };
-
-        Object.defineProperty(window, '__unityLandingTestHooks', {
-            value: hooks,
-            configurable: true,
-            enumerable: false
-        });
-    }
-
-    createLandingTestHooks();
 })();
