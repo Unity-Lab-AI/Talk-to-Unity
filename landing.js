@@ -186,6 +186,26 @@
     window.addEventListener('talk-to-unity:launch', handleLaunchEvent);
     window.addEventListener('focus', () => evaluateDependencies());
 
+    if (typeof window !== 'undefined') {
+        const createPassingResults = () =>
+            dependencyChecks.map((descriptor) => ({ ...descriptor, met: true }));
+
+        window.__unityLandingTestHooks = {
+            initialize: () => {
+                bootstrapLandingExperience();
+                return true;
+            },
+            evaluateDependencies: (options) => evaluateDependencies(options),
+            markAllDependenciesReady: () => {
+                const results = createPassingResults();
+                updateDependencyUI(results, true, { announce: true, missing: [] });
+                updateLaunchButtonState({ allMet: true, missing: [] });
+                setStatusMessage('All systems look good. Launching Talk to Unity…', 'success');
+                return { results, allMet: true, missing: [] };
+            }
+        };
+    }
+
     function evaluateDependencies({ announce = false } = {}) {
         const results = dependencyChecks.map((descriptor) => {
             let met = false;
