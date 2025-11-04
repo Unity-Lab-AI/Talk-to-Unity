@@ -13,7 +13,7 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 }
     },
     webServer: {
-        command: 'node playwright-server.mjs',
+        command: 'PLAYWRIGHT_SERVE_DIR=dist node playwright-server.mjs',
         port: 4173,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000

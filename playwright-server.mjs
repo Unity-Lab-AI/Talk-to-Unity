@@ -6,51 +6,95 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = 4173;
-const DIST_DIR = path.join(__dirname, 'dist');
+const projectRoot = __dirname;
+const candidateRoot = process.env.PLAYWRIGHT_SERVE_DIR
+    ? path.resolve(projectRoot, process.env.PLAYWRIGHT_SERVE_DIR)
+    : '';
+
+const hasCustomRoot = candidateRoot && fs.existsSync(candidateRoot);
+
+if (candidateRoot && !hasCustomRoot) {
+    console.warn(
+        `Requested Playwright serve directory "${candidateRoot}" was not found. Falling back to project root.`
+    );
+}
+
+const root = hasCustomRoot ? candidateRoot : projectRoot;
+const port = process.env.PORT ? Number(process.env.PORT) : 4173;
 
 const MIME_TYPES = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.txt': 'text/plain; charset=utf-8',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
+    '.jpeg': 'image/jpeg',
+    '.svg': 'image/svg+xml; charset=utf-8',
     '.ico': 'image/x-icon',
-    '.txt': 'text/plain'
+    '.webp': 'image/webp',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+    '.map': 'application/json; charset=utf-8'
 };
 
-const server = http.createServer((req, res) => {
-    let filePath = path.join(DIST_DIR, req.url === '/' ? 'index.html' : req.url);
+function safeJoin(base, target) {
+    const targetPath = target.startsWith('/') ? target : `/${target}`;
+    const resolvedPath = path.resolve(base, '.' + targetPath);
+    if (!resolvedPath.startsWith(base)) {
+        return null;
+    }
+    return resolvedPath;
+}
 
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-        filePath = path.join(DIST_DIR, 'index.html');
+const server = http.createServer((req, res) => {
+    const urlPath = decodeURIComponent(req.url.split('?')[0]);
+    let filePath = safeJoin(root, urlPath === '/' ? '/index.html' : urlPath);
+
+    if (!filePath) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Bad request');
+        return;
     }
 
-    const ext = path.extname(filePath);
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-    fs.readFile(filePath, (err, data) => {
-        if (err) {
-            res.writeHead(500);
-            res.end(`Error: ${err.message}`);
+    fs.stat(filePath, (statErr, stats) => {
+        if (statErr) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('Not found');
             return;
         }
 
-        res.writeHead(200, { 'Content-Type': contentType });
-        res.end(data);
+        if (stats.isDirectory()) {
+            filePath = path.join(filePath, 'index.html');
+        }
+
+        fs.readFile(filePath, (readErr, data) => {
+            if (readErr) {
+                res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Internal server error');
+                return;
+            }
+
+            const extension = path.extname(filePath).toLowerCase();
+            const mimeType = MIME_TYPES[extension] || 'application/octet-stream';
+            res.writeHead(200, {
+                'Content-Type': mimeType,
+                'Cache-Control': 'no-cache'
+            });
+            res.end(data);
+        });
     });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-    console.log(`Preview server running at http://127.0.0.1:${PORT}/`);
+server.listen(port, () => {
+    console.log(`Static server listening on http://127.0.0.1:${port} (serving ${root})`);
 });
 
-process.on('SIGTERM', () => {
-    server.close(() => {
-        console.log('Server stopped');
-        process.exit(0);
-    });
-});
+function shutdown() {
+    server.close(() => process.exit(0));
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
