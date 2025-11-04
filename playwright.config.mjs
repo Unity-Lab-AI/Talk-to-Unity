@@ -13,10 +13,13 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 }
     },
     webServer: {
-        command: 'PLAYWRIGHT_SERVE_DIR=dist node playwright-server.mjs',
+        command: 'node playwright-server.mjs',
         port: 4173,
         reuseExistingServer: !process.env.CI,
-        timeout: 120_000
+        timeout: 120_000,
+        env: {
+            PLAYWRIGHT_SERVE_DIR: 'dist'
+        }
     },
     reporter: [
         ['junit', { outputFile: 'playwright-report/results.xml' }],
