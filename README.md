@@ -1,4 +1,4 @@
-DEPRICATED APPLICATION try instead: https://github.com/Unity-Lab-AI/Talking-with-Unity.git https://www.unityailab.com/Talking-with-Unity
+DEPRICATED APPLICATION try instead: https://github.com/Unity-Lab-AI/Talking-with-Unity.git https://www.unityailab.com/Talking-with-Unity/
 
 # Talk to Unity in Plain English
 
