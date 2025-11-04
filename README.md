@@ -1,4 +1,5 @@
-DEPRICATED APPLICATION try https://github.com/Unity-Lab-AI/Talk-to-Unity
+DEPRICATED APPLICATION try [https://github.com/Unity-Lab-AI/Talk-to-Unity](https://github.com/Unity-Lab-AI/Talking-with-Unity.git)
+http://www.unityailab.com/Talking-with-Unity/
 # Talk to Unity in Plain English
 
 ![Main Branch Workflow Status](https://github.com/Unity-Lab-AI/Talk-to-Unity/actions/workflows/main.yml/badge.svg?branch=main)
