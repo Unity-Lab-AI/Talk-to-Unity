@@ -1,5 +1,5 @@
 DEPRICATED APPLICATION try instead: (https://github.com/Unity-Lab-AI/Talking-with-Unity.git)](https://www.unityailab.com/Talking-with-Unity/)
-http://www.unityailab.com/Talking-with-Unity/
+
 # Talk to Unity in Plain English
 
 ![Main Branch Workflow Status](https://github.com/Unity-Lab-AI/Talk-to-Unity/actions/workflows/main.yml/badge.svg?branch=main)
