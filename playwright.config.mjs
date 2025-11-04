@@ -1,6 +1,6 @@
-const { defineConfig } = require('@playwright/test');
+import { defineConfig } from '@playwright/test';
 
-module.exports = defineConfig({
+export default defineConfig({
     testDir: './tests',
     timeout: 60_000,
     expect: {
@@ -13,7 +13,7 @@ module.exports = defineConfig({
         viewport: { width: 1280, height: 720 }
     },
     webServer: {
-        command: 'node playwright-server.js',
+        command: 'node playwright-server.mjs',
         port: 4173,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000
